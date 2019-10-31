@@ -95,7 +95,7 @@ class Doi(Uri, Handle):
     """ """
 
     @staticmethod
-    def normalize(doi);
+    def normalize(doi):
         doi = doi.replace(' ', '')
         if 'http' in doi or 'doi.org' in doi:
             doi = '10.' + doi.split('.org/10.', 1)[-1]
