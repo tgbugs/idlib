@@ -31,6 +31,11 @@ class QNames(LocalConventions):
 class Identifier(str):  # TODO decide if str should be base ...
     """ Base class for all Identifiers """
 
+    @staticmethod
+    def normalize(identifier):
+        raise NotImplementedError
+        return identifier
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls, *args, **kwargs)
 
@@ -86,14 +91,25 @@ class Handle(Identifier):
 # ISO
 
 
-class DOI(Uri, Handle):
+class Doi(Uri, Handle):
     """ """
+
+    @staticmethod
+    def normalize(doi);
+        doi = doi.replace(' ', '')
+        if 'http' in doi or 'doi.org' in doi:
+            doi = '10.' + doi.split('.org/10.', 1)[-1]
+        elif doi.startswith('doi:'):
+            doi = doi.strip('doi:')
+        elif doi.startswith('DOI:'):
+            doi = doi.strip('DOI:')
+        return doi
 
 
 # NAAN
 
 
-class ARK(Identifier):
+class Ark(Identifier):
     """ """
 
 
