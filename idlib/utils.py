@@ -1,4 +1,5 @@
 import requests
+from idlib import exceptions as exc
 
 
 def resolution_chain(iri):
@@ -14,4 +15,4 @@ def resolution_chain(iri):
             break
 
     if head.status_code >= 400:
-        raise ResolutionError(f'Nothing found at {head.url}\n')
+        raise exc.ResolutionError(f'Nothing found at {head.url}\n')
