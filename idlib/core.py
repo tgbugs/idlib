@@ -110,6 +110,10 @@ class ORCID(Uri):  # TODO Uri or hasUriRepresentation ?
     # but I would need more information ...
 
 
+class Ror(Uri):
+    """ """
+
+
 class RRID(Identifier):
     """ """
 
