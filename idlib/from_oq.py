@@ -1,10 +1,13 @@
+from pathlib import Path
 import ontquery as oq  # temporary implementation detail
-import pyontutils.core
+from sparcur.config import auth as sauth  # temp
+from sparcur.utils import cache  # temp
+from pyontutils.namespaces import TEMP  # FIXME VERY temp
 import idlib
 
 
 # from neurondm.simple
-class OntTerm(pyontutils.core.OntTerm):
+class OntTerm(oq.OntTerm):
     """ ask things about a term! """
     skip_for_instrumentation = True
 
@@ -18,45 +21,6 @@ class OntTerm(pyontutils.core.OntTerm):
         newself = super().__new__(self.__class__, *self._args, **self._kwargs)
         self.__dict__ = newself.__dict__
         return self
-
-
-class DoiPrefixes(oq.OntCuries):
-    # set these manually since, sigh, factory patterns
-    _dict = {}
-    _n_to_p = {}
-    _strie = {}
-    _trie = {}
-
-
-DoiPrefixes({'DOI':'https://doi.org/',
-             'doi':'https://doi.org/',})
-
-
-class DoiId(OntId):
-    _namespaces = DoiPrefixes
-
-    class DoiMalformedError(Exception):
-        """ WHAT HAVE YOU DONE!? """
-
-    def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):
-        if doi_in_various_states_of_mangling is None and iri is not None:
-            doi_in_various_states_of_mangling = iri
-
-        normalize = idlib.Doi.normalize(doi_in_various_states_of_mangling)
-        self = super().__new__(cls, prefix='doi', suffix=normalize)
-        self._unnormalized = doi_in_various_states_of_mangling
-        return self
-
-    @property
-    def valid(self):
-        return self.suffix is not None and self.suffix.startswith('10.')
-
-    def asInstrumented(self):
-        return DoiInst(self)
-
-    @property
-    def handle(self):
-        return self.suffix
 
 
 class URIInstrumentation(oq.terms.InstrumentedIdentifier):
@@ -100,65 +64,6 @@ class URIInstrumentation(oq.terms.InstrumentedIdentifier):
             return uri  # FIXME TODO identifier it
 
 
-class DoiInst(URIInstrumentation, DoiId):
-    # TODO FIXME pull this into idlib or whatever we are calling it
-    #def __new__(self, doi_thing):
-        # FIXME autofetch ... hrm ... data vs metadata ...
-        #return super().__new__(doi_thing)
-
-    @property
-    def metadata(self):
-        # e.g. crossref, datacite, etc.
-        # so this stuff isnt quite to the spec that is doccumented here
-        # https://crosscite.org/docs.html
-        # nor here
-        # https://support.datacite.org/docs/datacite-content-resolver
-        accept = (
-            'application/vnd.datacite.datacite+json, '  # first so it can fail
-            'application/json, '  # undocumented fallthrough for crossref ?
-        )
-        resp = requests.get(self, headers={'Accept': accept})
-        if resp.ok:
-            return resp.json()
-        else:
-            resp.raise_for_status()  # TODO see if this is really a good idea or not
-
-    @property
-    def ttl(self):
-        # both datacite and crossref produce in turtle
-        resp = requests.get(self, headers={'Accept': 'text/turtle'})
-        return resp.text
-
-    @property
-    def data(self):
-        # FIXME TODO should the data associated with the doi
-        # be the metadata about the object or the object itself?
-        # from a practical standpoint derefercing the doi is
-        # required before you can content negotiate on the
-        # actual document itself, which is a practical necessity
-        # if somewhat confusing
-        return self.metadata
-
-    @property
-    def metadata_events(self):
-        """ metadata about dois from the crossref events api """
-        events_endpoint = 'https://api.eventdata.crossref.org/v1/events'
-        rp = aug.RepoPath(__file__)
-        try:
-            email = rp.repo.config_reader().get_value('user', 'email')
-            log.warning(f'your email {email} is being sent to crossref as part of the friendly way to use their api')
-            mailto = f'mailto={email}'
-        except aug.exceptions.NotInRepoError:
-            # TODO failover to the git repo api?
-            mailto = 'tgbugs+sparcur-no-git@gmail.com'
-
-        resp_obj = requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
-        resp_sub = requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')
-        # TODO if > 1000 get the rest using the pagination token
-        yield from resp_sub.json()['message']['events']
-        yield from resp_obj.json()['message']['events']
-
-
 class OrcidPrefixes(oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
@@ -171,7 +76,7 @@ OrcidPrefixes({'orcid':'https://orcid.org/',
                'ORCID':'https://orcid.org/',})
 
 
-class OrcidId(OntId):
+class OrcidId(oq.OntId):
     _namespaces = OrcidPrefixes
 
     class OrcidMalformedError(Exception):
@@ -213,7 +118,7 @@ PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
 })
 
 
-class PioId(OntId):
+class PioId(oq.OntId):
     _namespaces = PioPrefixes
 
     def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
@@ -316,7 +221,7 @@ PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
 })
 
 
-class PioUserId(OntId):
+class PioUserId(oq.OntId):
     _namespaces = PioUserPrefixes
 
 
@@ -356,7 +261,7 @@ RorPrefixes({'ror': 'https://ror.org/',
 })
 
 
-class RorId(OntId):
+class RorId(oq.OntId):
     _namespaces = RorPrefixes
     # TODO checksumming
     # TODO FIXME for ids like this should we render only the suffix
@@ -364,13 +269,13 @@ class RorId(OntId):
     # initial answer: yes
 
 
-class RorInst(URIInstrumentation, RorId):
+class Ror(URIInstrumentation, RorId):
 
     @property
     def data(self):
         return self._data(self.suffix)
 
-    @cache(Path(auth.get_path('cache-path'), 'ror_json'), create=True)
+    @cache(Path(sauth.get_path('cache-path'), 'ror_json'), create=True)
     def _data(self, suffix):
         # TODO data endpoint prefix ?? vs data endpoint pattern ...
         resp = requests.get(RorId(prefix='ror.api', suffix=suffix))
@@ -442,7 +347,7 @@ class RorInst(URIInstrumentation, RorId):
         # TODO also yeild all the associated grid identifiers
 
 
-class IsniId(OntId):  # TODO
+class IsniId(oq.OntId):  # TODO
     prefix = 'http://isni.org/isni/'
     _ror_key = 'ISNI'
 
@@ -454,7 +359,7 @@ class AutoId:
             if 'http' in something and 'doi.org' not in something:
                 pass  # probably a publisher uri that uses the handle
             else:
-                return DoiId(something)
+                return idlib.Doi(something)
 
         if 'orcid' in something:
             return OrcidId(something)
@@ -471,22 +376,3 @@ class AutoId:
 class AutoInst:
     def __new__(cls, something):
         return AutoId(something).asInstrumented()
-
-
-def get_right_id(uri):
-    # FIXME this is a bad way to do this ...
-    if isinstance(uri, DoiId) or 'doi' in uri and '/doi/' not in uri:
-        if isinstance(uri, DoiId):
-            di = uri.asInstrumented()
-        elif 'doi' in uri:
-            di = DoiInst(uri)
-
-        pi = di.resolve(PioId)
-
-    else:
-        if not isinstance(uri, PioId):
-            pi = PioId(uri)  #.normalize()
-        else:
-            pi = uri
-
-    return pi

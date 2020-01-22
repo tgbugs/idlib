@@ -1,3 +1,10 @@
+import idlib
+
+# families (mostly a curiosity)
+class families:
+    IETF = object()
+    ISO = object()
+    NAAN = object()
 
 
 # local conventions
@@ -78,14 +85,49 @@ class Identifier(str):  # TODO decide if str should be base ...
 
 class Urn(Identifier):
     """ """
+    _family = families.IETF
 
 
 class Iri(Identifier):
     """ """
+    _family = families.IETF
 
 
 class Uri(Iri):
     """ """
+    _family = families.IETF
+
+    # FIXME code duplication
+
+    @property
+    def resolution_chain(self):
+        # FIXME what should an identifier object represent?
+        # the eternal now of the identifier? or the state
+        # that it was in when this particular representation
+        # was created? This means that really each one of these
+        # objects should be timestamped and that equiality of
+        # instrumented objects should return false, which seems
+        # very bad for usability ...
+        if not hasattr(self, '_resolution_chain'):
+            # FIXME the chain should at least be formed out of
+            # IriHeader objects ...
+            self._resolution_chain = [uri for uri in resolution_chain(self)]
+
+        yield from self._resolution_chain
+
+    def resolve(self, target_class=None):
+        """ match the terminology used by pathlib """
+        # TODO generic probing instrumented identifier matcher
+        # by protocol, domain name, headers, etc.
+        for uri in self.resolution_chain:
+            pass
+
+        if target_class is not None:
+            return target_class(uri)
+
+        else:
+            return uri  # FIXME TODO identifier it
+
 
 class CompactifiedTemplate(Uri):
     _local_conventions = LocalConventions()
@@ -106,28 +148,7 @@ class CompactifiedTemplate(Uri):
 
 class Url(Uri):  # FIXME probably just remove this ...
     """ """
-
-
-class Handle(Identifier):
-    """ """
-
-
-# ISO
-
-
-class Doi(Uri, Handle):
-    """ """
-
-    @staticmethod
-    def normalize(doi):
-        doi = doi.replace(' ', '')
-        if 'http' in doi or 'doi.org' in doi:
-            doi = '10.' + doi.split('.org/10.', 1)[-1]
-        elif doi.startswith('doi:'):
-            doi = doi.strip('doi:')
-        elif doi.startswith('DOI:'):
-            doi = doi.strip('DOI:')
-        return doi
+    _family = families.IETF
 
 
 # NAAN
@@ -135,6 +156,7 @@ class Doi(Uri, Handle):
 
 class Ark(Identifier):
     """ """
+    _family = families.NAAN
 
 
 # Other

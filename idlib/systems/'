@@ -1,0 +1,91 @@
+import ontquery as oq  # temp implementation detail
+import idlib
+
+
+class _DoiPrefixes(oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+_DoiPrefixes({'DOI':'https://doi.org/',
+              'doi':'https://doi.org/',})
+
+class _DoiParser(oq.OntId):
+    """ The actual representation of the DOI, but we'll ignore that for now """
+    _namespaces = _DoiPrefixes
+
+    @property
+    def valid(self):
+        return self.suffix is not None and self.suffix.startswith('10.')
+
+    def validate(self):
+        if not self.valid:
+            raise exc.MalformedIdentifierError(f'{self._unnormalize} does not appear '
+                                               f'to be of type {self.__class__}')
+
+
+class Doi(idlib.Stream, idlib.Uri, idlib.Handle):  # FIXME that 'has canonical representaiton as a uri' issue
+    """ The DOI stream. """
+
+    _family = idlib.families.ISO
+
+    @staticmethod
+    def normalize(doi):
+        doi = doi.replace(' ', '')
+        if 'http' in doi or 'doi.org' in doi:
+            doi = '10.' + doi.split('.org/10.', 1)[-1]
+        elif doi.startswith('doi:'):
+            doi = doi.strip('doi:')
+        elif doi.startswith('DOI:'):
+            doi = doi.strip('DOI:')
+        return doi
+
+    def __init__(self, doi_in_various_states_of_mangling=None, iri=None):
+        if doi_in_various_states_of_mangling is None and iri is not None:
+            doi_in_various_states_of_mangling = iri
+
+        normalize = self.normalize(doi_in_various_states_of_mangling)
+        self._identifier = _DoiParser(prefix='doi', suffix=normalize)  # sigh
+        self._unnormalized = doi_in_various_states_of_mangling
+        self.identifier.validate()
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @property
+    def identifier_bound(self):
+        self.metadata()
+
+    def metadata(self):
+        # e.g. crossref, datacite, etc.
+        # so this stuff isnt quite to the spec that is doccumented here
+        # https://crosscite.org/docs.html
+        # nor here
+        # https://support.datacite.org/docs/datacite-content-resolver
+        accept = (
+            'application/vnd.datacite.datacite+json, '  # first so it can fail
+            'application/json, '  # undocumented fallthrough for crossref ?
+        )
+        resp = requests.get(self, headers={'Accept': accept})
+        if resp.ok:
+            return resp.json()
+        else:
+            resp.raise_for_status()  # TODO see if this is really a good idea or not
+
+    def data(self, mimetype=None):
+        # FIXME TODO should the data associated with the doi
+        # be the metadata about the object or the object itself?
+        # from a practical standpoint derefercing the doi is
+        # required before you can content negotiate on the
+        # actual document itself, which is a practical necessity
+        # if somewhat confusing
+        return requests.get(self.identifier)  # FIXME TODO
+
+    # alternate representations
+
+    def asHandle(self):
+        return idlib.Handle(self.suffix)

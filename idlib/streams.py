@@ -10,7 +10,7 @@ class Stream:
 
     @identifier.setter
     def identifier(self, value):
-        raise NotImplementedError
+        raise NotImplementedError  # probably should never allow this ...
 
     def checksum(self, cypher=None):  # FIXME default cypher value
         if not hasattr(self, '__checksum'):  # NOTE can set __checksum on the fly
@@ -37,7 +37,6 @@ class Stream:
 
     superstream = progenitor
 
-    @property
     def headers(self):
         """ Data from the lower level stream from which this stream is
             derived/differentiated """
@@ -57,20 +56,19 @@ class Stream:
         raise NotImplementedError
         return self.superstream.metadata
 
-    @headers.setter
-    def headers(self, value):
-        self._headers = value
-        raise NotImplementedError('If you override self.headers in the child '
-                                  'you need to reimplement this too.')
+    #@headers.setter
+    #def headers(self, value):
+        #self._headers = value
+        #raise NotImplementedError('If you override self.headers in the child '
+                                  #'you need to reimplement this too.')
 
-    @property
-    def data(self):
+    def data(self, mimetype_accept=None):
         """ The primary opaque datastream that will be differentiated
-            at the next level """
+            at the next level. Identifiers for classes and pysical samples
+            should return None or error on these. """
         raise NotImplementedError
 
-    @property
-    def metadata(self):
+    def metadata(self, mimetype_accept=None):
         """ stream metadata, hopefully as a header
 
             technically this should be called metadata_bound
