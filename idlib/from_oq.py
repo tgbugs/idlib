@@ -119,6 +119,12 @@ class Pio(idlib.Stream):
     progenitor = streams.StreamUri.progenitor
     headers = streams.StreamUri.headers
 
+    def __gt__(self, other):
+        if isinstance(other, idlib.Stream):
+            return self.identifier > other.identifier
+        else:
+            return False  # FIXME TODO
+
     @property
     def slug(self):
         return self.identifier.slug
