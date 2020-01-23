@@ -249,7 +249,9 @@ class StreamUri(Stream):
     def dereference_chain(self):
         # FIXME this is really dereference chain super
         return tuple(StringProgenitor(resp.url, progenitor=resp)
-                     for resp in resolution_chain_responses(self.identifier))
+                     for resp in
+                     resolution_chain_responses(self.identifier,
+                                                raise_on_final=False))
 
     @cache_result
     def dereference(self, asType=None):

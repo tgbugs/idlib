@@ -5,17 +5,21 @@
 #+begin_src racket
 #lang brag  ; this is actually racket but whatever
 ; TODO stream stream stream stream ... can go on forever ...
-stream-free : identifier-free
+stream-free : conventions-free
+            | identifier-free
             | metadata-free
             | data-free
             | other-free
 identifier-free : identifier  ; dereference this to get a any number of streams
 identifier : checksum-stream  ; hard to resolve
+           | identifier-global
+           | identifier-local  ; plus expansion rule
            | bytes  ; modulo encoding, but a string none the less
 checksum-stream : bytes
 metadata-free : stream-bound  ; secondary referents
 data-free : stream-bound  ; primary referents
-stream-bound : identifier-bound [checksum-next-bound]
+stream-bound : conventions-bound  ; aka local conventions
+             | identifier-bound [checksum-next-bound]
              | identifier-bound metadata-bound [checksum-next-bound]
              | identifier-bound metadata-bound data-bound [checksum-next-bound]
              | [identifier-bound] [metadata-bound] [data-bound] [checksum-next-bound]

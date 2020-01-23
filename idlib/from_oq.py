@@ -1,6 +1,7 @@
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
+from idlib.utils import cache_result
 
 
 # from neurondm.simple
@@ -71,7 +72,7 @@ PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
 })
 
 
-class PioId(oq.OntId):
+class PioId(oq.OntId, idlib.Identifier):
     _namespaces = PioPrefixes
 
     def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
@@ -104,20 +105,31 @@ class PioId(oq.OntId):
         return self.suffix.rsplit('/', 1)[0] if '/' in self.suffix else self.suffix
 
 
-class PioInst(URIInstrumentation, PioId):
+class Pio(idlib.Stream):
     """ instrumented protocols """
+
+    _id_class = PioId
     # FIXME defining this here breaks the import chain
     # since protocols.py imports from core.py (sigh)
     _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
     # but what do you want :/
 
+    dereference_chain = streams.StreamUri.dereference_chain
+    dereference = streams.StreamUri.dereference
+    progenitor = streams.StreamUri.progenitor
+    headers = streams.StreamUri.headers
+
+    @property
+    def slug(self):
+        return self.identifier.slug
+
     @property
     def doi(self):
-        data = self.data
+        data = self.data()
         if data:
             doi = data['doi']
             if doi:
-                return DoiId(doi)
+                return idlib.Doi(doi)
 
     @property
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
@@ -128,12 +140,14 @@ class PioInst(URIInstrumentation, PioId):
             if uri:
                 return self.__class__(prefix='pio.view', suffix=uri)
 
-    @property
     def data(self):
         if not hasattr(self, '_data'):
-            blob = self._protocol_data.protocol(self.iri)
-            self._status_code = blob['status_code']
-            self._data = blob['protocol']
+            blob = self._protocol_data.protocol(self.identifier)
+            if blob is not None:
+                self._status_code = blob['status_code']
+                self._data = blob['protocol']
+            else:
+                self._data = None  # FIXME raise
 
         return self._data
 
@@ -178,7 +192,8 @@ class PioUserId(oq.OntId):
     _namespaces = PioUserPrefixes
 
 
-class PioUserInst(URIInstrumentation, PioUserId):
+class PioUser(idlib.Stream):
+    _id_class = PioUserId
     _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
 
     @property
@@ -189,22 +204,19 @@ class PioUserInst(URIInstrumentation, PioUserId):
     def uri_api(self):
         return self.__class__(prefix='pio.api.user', suffix=self.suffix)
 
-    @property
-    def data(self):
-        if not hasattr(self, '_data'):
-            uri = self.uri_api + '?with_extras=1'
-            # FIXME this is a dumb an convoluted way to get authed api access
-            blob = self._protocol_data.get(uri)
-            self._status_code = blob['status_code']
-            self._data = blob['researcher']
-
-        return self._data
+    @cache_result
+    def metadata(self):
+        uri = self.uri_api + '?with_extras=1'
+        # FIXME this is a dumb an convoluted way to get authed api access
+        blob = self._protocol_data.get(uri)
+        self._status_code = blob['status_code']
+        return blob['researcher']
 
     @property
     def orcid(self):
-        orcid = self.data['orcid']
+        orcid = self.metadata()['orcid']
         if orcid is not None:
-            return OrcidId(prefix='orcid', suffix=orcid)
+            return idlib.Orcid(prefix='orcid', suffix=orcid)
 
 
 class IsniId(oq.OntId):  # TODO
@@ -212,7 +224,7 @@ class IsniId(oq.OntId):  # TODO
     _ror_key = 'ISNI'
 
 
-class AutoId:
+class Auto:
     """ dispatch to type on identifier structure """
     def __new__(cls, something):
         if '10.' in something:
@@ -222,17 +234,12 @@ class AutoId:
                 return idlib.Doi(something)
 
         if 'orcid' in something:
-            return OrcidId(something)
+            return idlib.Orcid(something)
 
         if '/ror.org/' in something or something.startswith('ror:'):
-            return RorId(something)
+            return idlib.Ror(something)
 
         if 'protocols.io' in something:
-            return PioId(something)
+            return idlib.Pio(something)
 
-        return oq.OntId(something)
-
-
-class AutoInst:
-    def __new__(cls, something):
-        return AutoId(something).asInstrumented()
+        return oq.OntId(something)  # FIXME idlib.StreamUri ?

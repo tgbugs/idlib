@@ -18,11 +18,7 @@ RorPrefixes({'ror': 'https://ror.org/',
 })
 
 
-class RorId(
-        oq.OntId,
-        idlib.Identifier,  # identifier comes before stream so _id_class is set properly
-        idlib.Stream,
-):
+class RorId(oq.OntId, idlib.Identifier):
     _namespaces = RorPrefixes
     # TODO checksumming
     # TODO FIXME for ids like this should we render only the suffix

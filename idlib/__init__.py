@@ -6,10 +6,9 @@ from idlib.identifiers import (Identifier,)
 from idlib.local_conventions import (LocalConventions,
                                      Curies,
                                      QNames,)
-from idlib.from_oq import (PioId,  # FIXME name
-                           PioInst, # FIXME name and impl
-                           PioUserInst, # FIXME name and impl
-)
+from idlib.from_oq import (Auto,
+                           Pio,
+                           PioUser,)
 from idlib.systems import (Ark,
                            Doi,
                            Handle,
@@ -30,11 +29,11 @@ def get_right_id(uri):
         elif 'doi' in uri:
             di = Doi(uri)
 
-        pi = di.dereference(PioId)
+        pi = di.dereference(Pio)
 
     else:
-        if not isinstance(uri, PioId):
-            pi = PioId(uri)  #.normalize()
+        if not isinstance(uri, Pio):
+            pi = Pio(uri)  #.normalize()
         else:
             pi = uri
 
