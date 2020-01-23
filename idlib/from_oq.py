@@ -1,9 +1,6 @@
-from pathlib import Path
 import ontquery as oq  # temporary implementation detail
-from sparcur.config import auth as sauth  # temp
-from sparcur.utils import cache  # temp
-from pyontutils.namespaces import TEMP  # FIXME VERY temp
 import idlib
+from idlib import streams
 
 
 # from neurondm.simple
@@ -12,7 +9,7 @@ class OntTerm(oq.OntTerm):
     skip_for_instrumentation = True
 
     def __new__(cls, *args, **kwargs):
-        self = OntId.__new__(cls, *args, **kwargs)
+        self = oq.OntId.__new__(cls, *args, **kwargs)
         self._args = args
         self._kwargs = kwargs
         return self
@@ -62,50 +59,6 @@ class URIInstrumentation(oq.terms.InstrumentedIdentifier):
 
         else:
             return uri  # FIXME TODO identifier it
-
-
-class OrcidPrefixes(oq.OntCuries):
-    # set these manually since, sigh, factory patterns
-    _dict = {}
-    _n_to_p = {}
-    _strie = {}
-    _trie = {}
-
-
-OrcidPrefixes({'orcid':'https://orcid.org/',
-               'ORCID':'https://orcid.org/',})
-
-
-class OrcidId(oq.OntId):
-    _namespaces = OrcidPrefixes
-
-    class OrcidMalformedError(Exception):
-        """ WHAT HAVE YOU DONE!? """
-
-    class OrcidLengthError(OrcidMalformedError):
-        """ wrong length """
-
-    class OrcidChecksumError(OrcidMalformedError):
-        """ failed checksum """
-
-    @property
-    def checksumValid(self):
-        """ see
-        https://support.orcid.org/hc/en-us/articles/360006897674-Structure-of-the-ORCID-Identifier
-        """
-
-        try:
-            *digits, check_string = self.suffix.replace('-', '')
-            check = 10 if check_string == 'X' else int(check_string)
-            total = 0
-            for digit_string in digits:
-                total = (total + int(digit_string)) * 2
-
-            remainder = total % 11
-            result = (12 - remainder) % 11
-            return result == check
-        except ValueError as e:
-            raise self.OrcidChecksumError(self) from e
 
 
 class _PioPrefixes(oq.OntCuries): pass
@@ -254,99 +207,6 @@ class PioUserInst(URIInstrumentation, PioUserId):
             return OrcidId(prefix='orcid', suffix=orcid)
 
 
-class _RorPrefixes(oq.OntCuries): pass
-RorPrefixes = _RorPrefixes.new()
-RorPrefixes({'ror': 'https://ror.org/',
-             'ror.api': 'https://api.ror.org/organizations/',
-})
-
-
-class RorId(oq.OntId):
-    _namespaces = RorPrefixes
-    # TODO checksumming
-    # TODO FIXME for ids like this should we render only the suffix
-    # since the prefix is redundant with the identifier type?
-    # initial answer: yes
-
-
-class Ror(URIInstrumentation, RorId):
-
-    @property
-    def data(self):
-        return self._data(self.suffix)
-
-    @cache(Path(sauth.get_path('cache-path'), 'ror_json'), create=True)
-    def _data(self, suffix):
-        # TODO data endpoint prefix ?? vs data endpoint pattern ...
-        resp = requests.get(RorId(prefix='ror.api', suffix=suffix))
-        if resp.ok:
-            return resp.json()
-
-    @property
-    def name(self):
-        return self.data['name']
-
-    label = name  # map their schema to ours
-
-    def asExternalId(self, id_class):
-        eids = self.data['external_ids']
-        if id_class._ror_key in eids:
-            eid_record = eids[id_class._ror_key]
-            if eid_record['preferred']:
-                eid = eid_record['preferred']
-            else:
-                eid_all = eid_record['all']
-                if isinstance(eid_all, str):  # https://github.com/ror-community/ror-api/issues/53
-                    eid = eid_all
-                else:
-                    eid = eid_all[0]
-
-            return id_class(eid)
-
-    _type_map = {
-        'Education': TEMP.Institution,
-        'Healthcare': TEMP.Institution,
-        'Facility': TEMP.CoreFacility,
-        'Nonprofit': TEMP.Nonprofit,
-        'Other': TEMP.Institution,
-    }
-    @property
-    def institutionTypes(self):
-        if 'types' in self.data:
-            for t in self.data['types']:
-                if t == 'Other':
-                    log.info(self.label)
-
-                yield self._type_map[t]
-
-        else:
-            log.critical(self.data)
-            raise TypeError('wat')
-
-    @property
-    def synonyms(self):
-        d = self.data
-        # FIXME how to deal with type conversion an a saner way ...
-        yield from [rdflib.Literal(s) for s in d['aliases']]
-        yield from [rdflib.Literal(s) for s in d['acronyms']]
-        yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
-
-    @property
-    def triples_gen(self):
-        """ produce a triplified version of the record """
-        s = self.u
-        a = rdf.type
-        yield s, a, owl.NamedIndividual
-        for o in self.institutionTypes:
-            yield s, a, o
-
-        yield s, rdfs.label, rdflib.Literal(self.label)
-        for o in self.synonyms:
-            yield s, NIFRID.synonym, o  # FIXME this looses information about synonym type
-
-        # TODO also yeild all the associated grid identifiers
-
-
 class IsniId(oq.OntId):  # TODO
     prefix = 'http://isni.org/isni/'
     _ror_key = 'ISNI'
@@ -370,7 +230,7 @@ class AutoId:
         if 'protocols.io' in something:
             return PioId(something)
 
-        return OntId(something)
+        return oq.OntId(something)
 
 
 class AutoInst:

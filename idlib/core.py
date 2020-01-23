@@ -35,7 +35,7 @@ class QNames(LocalConventions):
 # identifiers
 
 
-class Identifier(str):  # TODO decide if str should be base ...
+class Identifier(str, idlib.Stream):  # TODO decide if str should be base ...
     """ Base class for all Identifiers """
     # all identifiers mapped to idlib should have a string representation
     # or be representable as strings in as unambiguous a way as possible
@@ -56,16 +56,21 @@ class Identifier(str):  # TODO decide if str should be base ...
     # a local identifier is used without conventions
     # same with local:?:1, local:?:2, local:?:3, local:?:4
 
-    @staticmethod
-    def normalize(identifier):
-        raise NotImplementedError
-        return identifier
+    _id_class = str
+    #@staticmethod
+    #def normalize(identifier):
+        #raise NotImplementedError
+        #return identifier
 
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls, *args, **kwargs)
 
-    def exists(self):
-        raise NotImplementedError
+    def __init__(self, *args, **kwargs):
+        return super().__init__(*args, **kwargs)
+
+    #def exists(self):
+        # bad identifiers are not allowed to finish __init__
+        #raise NotImplementedError
 
     def metadata(self):
         raise NotImplementedError
@@ -80,103 +85,20 @@ class Identifier(str):  # TODO decide if str should be base ...
         return conventions(self)
 
 
-# IETF
-
-
-class Urn(Identifier):
-    """ """
-    _family = families.IETF
-
-
-class Iri(Identifier):
-    """ """
-    _family = families.IETF
-
-
-class Uri(Iri):
-    """ """
-    _family = families.IETF
-
-    # FIXME code duplication
-
-    @property
-    def resolution_chain(self):
-        # FIXME what should an identifier object represent?
-        # the eternal now of the identifier? or the state
-        # that it was in when this particular representation
-        # was created? This means that really each one of these
-        # objects should be timestamped and that equiality of
-        # instrumented objects should return false, which seems
-        # very bad for usability ...
-        if not hasattr(self, '_resolution_chain'):
-            # FIXME the chain should at least be formed out of
-            # IriHeader objects ...
-            self._resolution_chain = [uri for uri in resolution_chain(self)]
-
-        yield from self._resolution_chain
-
-    def resolve(self, target_class=None):
-        """ match the terminology used by pathlib """
-        # TODO generic probing instrumented identifier matcher
-        # by protocol, domain name, headers, etc.
-        for uri in self.resolution_chain:
-            pass
-
-        if target_class is not None:
-            return target_class(uri)
-
-        else:
-            return uri  # FIXME TODO identifier it
-
-
-class CompactifiedTemplate(Uri):
-    _local_conventions = LocalConventions()
-    # maybe simpler to implement as a
-    # lifting rule over local conventions
-    # which raises them to have a global status
-    # when parsing strings?
-    def __new__(cls, local_or_global):
-        # if short make long
-        # if long make short etc.
-        # probably take from ontquery
-        local = local_or_global  # TODO
-        global_ = local_or_global  # TODO
-        self = super().__new__(cls, global_)
-        self.local = local
-        # FIXME this is all shorthand that should be rewritten
-
-
-class Url(Uri):  # FIXME probably just remove this ...
-    """ """
-    _family = families.IETF
-
-
-# NAAN
-
-
-class Ark(Identifier):
-    """ """
-    _family = families.NAAN
-
-
 # Other
 
 
-class ISNI(Uri):
+'''
+class ISNI(idlib.Uri):
     """ """
 
 
-class ORCID(Uri):  # TODO Uri or hasUriRepresentation ?
+class ORCID(idlib.Uri):  # TODO Uri or hasUriRepresentation ?
     """ """
     # wiki has claims that Orcids are Isnis
     # but I would need more information ...
 
 
-class Ror(Uri):
-    """ """
 
 
-class RRID(Identifier):
-    """ """
-
-
+'''

@@ -1,40 +1,92 @@
 import hashlib
 import unittest
-from idlib import Doi
-from idlib.from_oq import OrcidId  # FIXME naming etc.
+import idlib
 
 
-class TestDoi(unittest.TestCase):
-    def test_doi_format(self):
-        d = Doi('https://doi.org/10.13003/5jchdy')
-        d.identifier
-        d.identifier_bound_metadata
-        d.identifier_bound_version_metadata
-        d.checksum(hashlib.blake2b)  # data or metadata? indication that there should be multiple probably
-        d.headers()
-        d.metadata()
-        d.data()
-        d.progenitor()  # or is it d.data.progenitor?
+class StreamHelper:
+    stream = None
+    ids = tuple()
+    def test_stream_sections(self):
+        for i in self.ids:
+            d = self.stream(i)
+            d.identifier
+            d.identifier_bound_metadata
+            d.identifier_bound_version_metadata
+            d.checksum(hashlib.blake2b)  # data or metadata? indication that there should be multiple probably
+            d.dereference()
+            d.headers()
+            d.metadata()
 
+            if not isinstance(d, idlib.StreamNoData):
+                d.data()
+
+            d.progenitor()  # or is it d.data.progenitor?
+
+
+class TestDoi(StreamHelper, unittest.TestCase):
+    stream = idlib.Doi
+    ids = [
+        'https://doi.org/10.13003/5jchdy',
+    ]
     def test_version_f1000(self):
         # this doesn't exist
-        #d = Doi('https://doi.org/10.12688/f1000research.6555')
+        #d = idlib.Doi('https://doi.org/10.12688/f1000research.6555')
         #d = d.identifier_bound_version_metadata
 
-        d1 = Doi('https://doi.org/10.12688/f1000research.6555.1')
+        d1 = idlib.Doi('https://doi.org/10.12688/f1000research.6555.1')
         d1.identifier_bound_version_metadata
         # of course there is no linke between the two >_<
-        d2 = Doi('https://doi.org/10.12688/f1000research.6555.2')
+        d2 = idlib.Doi('https://doi.org/10.12688/f1000research.6555.2')
         d2.identifier_bound_version_metadata
         # has an 'update-to' field ... which points backwards
         # but how to see if there is something new?
 
 
-class TestOrcidId(unittest.TestCase):
+class TestOrcid(StreamHelper, unittest.TestCase):
+    stream = idlib.Orcid
+    ids = [
+        'https://orcid.org/0000-0002-1825-0097',
+        'https://orcid.org/0000-0001-5109-3700',
+        'https://orcid.org/0000-0002-1694-233X',
+    ]
     def test_validate(self):
-        orcids = ('https://orcid.org/0000-0002-1825-0097',
-                  'https://orcid.org/0000-0001-5109-3700',
-                  'https://orcid.org/0000-0002-1694-233X')
-        ids = [OrcidId(orcid) for orcid in orcids]
+        ids = [self.stream._id_class(orcid) for orcid in self.ids]
         bads = [orcid for orcid in ids if not orcid.checksumValid]
         assert not bads, str(bads)
+
+
+class TestRor(StreamHelper, unittest.TestCase):
+    stream = idlib.Ror
+    ids = [
+        'https://ror.org/0168r3w48',
+    ]
+
+    def test_init(self):
+        ic = idlib.Ror._id_class
+        r = idlib.Ror._id_class(prefix='ror.api', suffix='0168r3w48')
+        assert type(r.identifier) is str
+
+    def test_triples(self):
+        import rdflib
+        from pyontutils.namespaces import rdf, rdfs, owl, NIFRID
+        locs = locals()
+        kwargs = {n:locs[n] for n in
+                  ['rdflib',
+                   'rdf',
+                   'rdfs',
+                   'owl',
+                   'NIFRID',]}
+        idlib.Ror.bindRdf(**kwargs)
+        r = idlib.Ror(self.ids[0])
+        list(r.triples_gen)
+
+class TestStreamUri(StreamHelper, unittest.TestCase):
+    stream = idlib.StreamUri
+    ids = [
+        'https://github.com',
+    ]
+    def test_wat(self):
+        ic = self.stream._id_class
+        i = ic(self.ids[0])
+        breakpoint()
+        'asdf'

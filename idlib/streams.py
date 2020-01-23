@@ -1,4 +1,36 @@
+import requests
+import idlib
+from idlib import exceptions as exc
+from idlib.utils import cache_result, resolution_chain_responses, StringProgenitor
+
+
 class Stream:
+
+    _id_class = None
+
+    def __init__(self, identifier_or_id_as_string=None, *args, **kwargs):
+        if isinstance(self, idlib.Identifier):
+            # stream should always come last in the mro so it will hit object
+            super().__init__() #identifier_or_id_as_string, *args, **kwargs)
+            self._identifier = self._id_class(self)
+
+        else:
+            if isinstance(identifier_or_id_as_string, self._id_class):
+                self._identifier = identifier_or_id_as_string
+            else:
+                if self._id_class == str and identifier_or_id_as_string is None:
+                    # have to protect string identifiers because they can't type
+                    # check their own inputs
+                    raise TypeError('identifier_or_id_as_string may not be None')
+
+                self._identifier = self._id_class(identifier_or_id_as_string)
+
+    def asType(self, _class):
+        # FIXME not quite ... but close
+        return _class(self)
+
+    def __contains__(self, value):
+        return value in self.identifier
 
     @property
     def identifier(self):
@@ -6,11 +38,11 @@ class Stream:
         # FIXME interlex naming conventions call this a reference_name
         # in order to give it a bit more lexical distance from identity
         # which implies some hash function
-        raise NotImplementedError
+        return self._identifier
 
     @identifier.setter
     def identifier(self, value):
-        raise NotImplementedError  # probably should never allow this ...
+        raise NotImplementedError("You probably meant to set self._identifier?")  # probably should never allow this ...
 
     def checksum(self, cypher=None):  # FIXME default cypher value
         if not hasattr(self, '__checksum'):  # NOTE can set __checksum on the fly
@@ -36,6 +68,13 @@ class Stream:
         raise NotImplementedError
 
     superstream = progenitor
+
+    def dereference_chain(self):
+        raise NotImplementedError
+
+    def dereference(self, asType=None):
+        """ Many identifier systems have native dereferincing semantics """
+        raise NotImplementedError
 
     def headers(self):
         """ Data from the lower level stream from which this stream is
@@ -94,3 +133,92 @@ class Stream:
         return self.metadata.identifier_version
 
 
+class StreamNoData(Stream):
+    def data(self):
+        raise exc.IdentifierDoesDereferenceToDataError(self)
+
+    @property
+    def id_bound_data(self):
+        raise exc.IdentifierDoesDereferenceToDataError(self)
+
+    @property
+    def _prgn_metadata(self):
+        if hasattr(self, '_resp_metadata'):
+            return self._resp_metadata
+        elif hasattr(self, '_path_metadata'):
+            return self._path_metadata
+        else:
+            raise AttributeError('no progenitor for metadata')
+
+    def progenitor(self):
+        metadata = self.metadata()
+        # metadata.progenitor  # FIXME really prefer this ...
+        return self.dereference_chain(), self._prgn_metadata  # FIXME assumptions about uri ...
+
+
+class StreamUri(Stream):
+    """ Implementation of basic methods for URI streams.
+
+    Probably don't inherit from this class, just reassign them directly
+    to any class those primary implementaiton uses uris.
+    There are a couple of different ways to do this ...
+
+    Of course then we can't use super() to provide additional information, sigh.
+    """
+
+    #_id_class = idlib.Uri
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @cache_result
+    def dereference_chain(self):
+        # FIXME this is really dereference chain super
+        return tuple(StringProgenitor(resp.url, progenitor=resp) for resp in resolution_chain_responses(self.identifier))
+
+    @cache_result
+    def dereference(self, asType=None):
+        drc = self.dereference_chain()
+        uri = drc[-1]
+        if asType:
+            return asType(uri)
+        else:
+            # just return the strprg if no type is set
+            # don't assume dereferencing is type preserving
+            # if we wanted to be really strict about types then we would force
+            # explicit conversion to a actionable form and then dereference
+            # i.e. ident.actionable().dereference() but that is a pain since
+            # the original stream object looses its connection, and the identifier
+            # type itself needs to know how to make itself actionable, which it
+            # can't quite do in a complete way, in a minimal way probably
+            return uri
+
+    def progenitor(self):
+        # FIXME there is no single progeneitor here ?
+        # or rather, the stream is broken up into objects
+        # long before we can do anything about it
+
+        # also metadata headers and data headers are separate
+        # possibly even more separate than desired, but of course
+        # these aren't single streams, they are bundles of streams
+        # so tuple ?
+        #self.dereference()
+        self.metadata()
+        self.data()
+        return self.dereference_chain(), self._resp_metadata, self._resp_data
+
+    @cache_result
+    def headers(self):
+        uri = self.dereference()
+        return uri.progenitor.headers
+
+    def data(self, mimetype_accept=None):
+        # FIXME TODO should the data associated with the doi
+        # be the metadata about the object or the object itself?
+        # from a practical standpoint derefercing the doi is
+        # required before you can content negotiate on the
+        # actual document itself, which is a practical necessity
+        # if somewhat confusing
+        self._resp_data = requests.get(self.identifier)  # FIXME TODO
+        return self._resp_data.content

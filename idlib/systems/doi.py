@@ -1,7 +1,9 @@
 import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
 import idlib
-from idlib.utils import cache_result, resolution_chain_responses
+from idlib import streams
+from idlib import exceptions as exc
+from idlib.utils import cache_result
 
 
 class _DoiPrefixes(oq.OntCuries):
@@ -15,9 +17,10 @@ class _DoiPrefixes(oq.OntCuries):
 _DoiPrefixes({'DOI':'https://doi.org/',
               'doi':'https://doi.org/',})
 
-class DoiId(oq.OntId, idlib.Stream):  # also _technically_ a stream
+class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a stream
     """ The actual representation of the DOI, but we'll ignore that for now """
     _namespaces = _DoiPrefixes
+    _id_class = str  # eventually we have to drop down to something
 
     def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):
         if doi_in_various_states_of_mangling is None and iri is not None:
@@ -29,14 +32,14 @@ class DoiId(oq.OntId, idlib.Stream):  # also _technically_ a stream
         self.validate()
         return self
 
-    @property
-    def identifier(self):
-        # identifier streams return themselves as their identifier
-        return self
+    #@property
+    #def identifier(self):
+        ## identifier streams return themselves as their identifier
+        #return self
 
     def _checksum(self, cypher):
         m = cypher()
-        m.update(str(self).encode())
+        m.update(self.identifier.encode())
         return m.digest()
 
     @property
@@ -64,22 +67,33 @@ class DoiId(oq.OntId, idlib.Stream):  # also _technically_ a stream
 
     def validate(self):
         if not self.valid:
-            raise exc.MalformedIdentifierError(f'{self._unnormalize} does not appear '
+            raise exc.MalformedIdentifierError(f'{self._unnormalized} does not appear '
                                                f'to be of type {self.__class__}')
 
 
-class Doi(idlib.Stream, idlib.Uri, idlib.Handle):  # FIXME that 'has canonical representaiton as a uri' issue
+
+# have to exclude, idlib.Uri, idlib.Handle because they are the identifiers NOT the
+# streams, and the streams aren't just strings, oops!
+# BUT WAIT: maybe we DO want to conflate them!
+class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' issue
     """ The DOI stream. """
 
     _family = idlib.families.ISO
     _id_class = DoiId
+    dereference_chain = streams.StreamUri.dereference_chain
+    dereference = streams.StreamUri.dereference
+    progenitor = streams.StreamUri.progenitor
+    headers = streams.StreamUri.headers
+    data = streams.StreamUri.data
 
     def __init__(self, doi_in_various_states_of_mangling=None, iri=None):
         self._identifier = self._id_class(doi_in_various_states_of_mangling, iri)
 
-    @property
-    def identifier(self):
-        return self._identifier
+    def __gt__(self, other):
+        if isinstance(other, idlib.Stream):
+            return self.identifier > other.identifier
+        else:
+            return False  # FIXME TODO
 
     @property
     def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
@@ -108,24 +122,6 @@ class Doi(idlib.Stream, idlib.Uri, idlib.Handle):  # FIXME that 'has canonical r
         return None  # FIXME TODO
 
     identifier_bound_data = id_bound_data
-    def progenitor(self):
-        # FIXME there is no single progeneitor here ?
-        # or rather, the stream is broken up into objects
-        # long before we can do anything about it
-
-        # also metadata headers and data headers are separate
-        # possibly even more separate than desired, but of course
-        # these aren't single streams, they are bundles of streams
-        # so tuple ?
-        self.headers()
-        self.metadata()
-        self.data()
-        return self._chain_headers, self._resp_metadata, self._resp_data
-
-    @cache_result
-    def headers(self):
-        self._chain_headers  = list(resolution_chain_responses(self))
-        return self._chain_headers[-1].headers
 
     @cache_result
     def metadata(self):
@@ -138,7 +134,7 @@ class Doi(idlib.Stream, idlib.Uri, idlib.Handle):  # FIXME that 'has canonical r
             'application/vnd.datacite.datacite+json, '  # first so it can fail
             'application/json, '  # undocumented fallthrough for crossref ?
         )
-        resp = requests.get(self, headers={'Accept': accept})
+        resp = requests.get(self.identifier, headers={'Accept': accept})
         self._resp_metadata = resp  # FIXME for progenitor
         if resp.ok:
             return resp.json()
@@ -155,22 +151,11 @@ class Doi(idlib.Stream, idlib.Uri, idlib.Handle):  # FIXME that 'has canonical r
         m.update(str(ts_created).encode())  # unix epoch -> ??
         return m.digest()
 
-
-    def data(self, mimetype_accept=None):
-        # FIXME TODO should the data associated with the doi
-        # be the metadata about the object or the object itself?
-        # from a practical standpoint derefercing the doi is
-        # required before you can content negotiate on the
-        # actual document itself, which is a practical necessity
-        # if somewhat confusing
-        self._resp_data = requests.get(self)  # FIXME TODO
-        return self._resp_data.content
-
     # additional streams ...
 
     def ttl(self):  # this is another potential way to deal with mimetypes
         # both datacite and crossref produce in turtle
-        resp = requests.get(self, headers={'Accept': 'text/turtle'})
+        resp = requests.get(self.identifier, headers={'Accept': 'text/turtle'})
         return resp.text
 
     def metadata_events(self):

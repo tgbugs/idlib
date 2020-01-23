@@ -1,27 +1,31 @@
+from idlib.streams import (Stream,
+                           StreamNoData,
+                           StreamUri,)
 from idlib.core import (Identifier,
-                        Uri,
                         Curies,)
-from idlib.from_oq import (Ror,
-                           OrcidId,  # FIXME name
-                           PioId,  # FIXME name
+from idlib.from_oq import (PioId,  # FIXME name
                            PioInst, # FIXME name and impl
                            PioUserInst, # FIXME name and impl
 )
 from idlib.core import families
-from idlib.streams import Stream
-from idlib.systems.handle import Handle
-from idlib.systems.doi import Doi
+from idlib.systems import (Doi,
+                           Handle,
+                           Orcid,
+                           Ror,
+                           Rrid,
+                           Uri,
+                           Urn,)
 
 
 def get_right_id(uri):
     # FIXME this is a bad way to do this ...
     if isinstance(uri, Doi) or 'doi' in uri and '/doi/' not in uri:
         if isinstance(uri, Doi):
-            di = uri.asInstrumented()
+            di = uri
         elif 'doi' in uri:
-            di = DoiInst(uri)
+            di = Doi(uri)
 
-        pi = di.resolve(PioId)
+        pi = di.dereference(PioId)
 
     else:
         if not isinstance(uri, PioId):

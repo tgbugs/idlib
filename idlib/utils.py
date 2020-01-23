@@ -3,6 +3,19 @@ import requests
 from idlib import exceptions as exc
 
 
+class StringProgenitor(str):
+    def __new__(cls, value, *, progenitor=None):
+        if progenitor is None:
+            raise TypeError('progenitor is a required keyword argument')
+
+        self = super().__new__(cls, value)
+        self.progenitor = progenitor
+        return self
+
+    def __getnewargs_ex__(self):
+        return (self,), dict(progenitor=self.progenitor)
+
+
 def resolution_chain(iri):
     for head in resolution_chain_responses(iri):
         yield head.url
