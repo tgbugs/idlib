@@ -1,13 +1,15 @@
+from idlib.core import families
 from idlib.streams import (Stream,
                            StreamNoData,
                            StreamUri,)
-from idlib.core import (Identifier,
-                        Curies,)
+from idlib.identifiers import (Identifier,)
+from idlib.local_conventions import (LocalConventions,
+                                     Curies,
+                                     QNames,)
 from idlib.from_oq import (PioId,  # FIXME name
                            PioInst, # FIXME name and impl
                            PioUserInst, # FIXME name and impl
 )
-from idlib.core import families
 from idlib.systems import (Doi,
                            Handle,
                            Orcid,
@@ -16,6 +18,8 @@ from idlib.systems import (Doi,
                            Uri,
                            Urn,)
 
+# assign default identifier classes to streams
+StreamUri._id_class = Uri
 
 def get_right_id(uri):
     # FIXME this is a bad way to do this ...

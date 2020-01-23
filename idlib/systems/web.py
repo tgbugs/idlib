@@ -1,8 +1,9 @@
+import ontquery as oq  # temp
 import idlib
 from idlib import families
 
 
-class Iri(idlib.Identifier):
+class Iri(oq.OntId, idlib.Identifier):  # FIXME OntId is only temporary
     """ """
     _family = families.IETF
 
@@ -17,7 +18,7 @@ class Uri(Iri):
 
 
 class CompactifiedTemplate(Uri):
-    #_local_conventions = LocalConventions()
+    _local_conventions = idlib.LocalConventions()
     # maybe simpler to implement as a
     # lifting rule over local conventions
     # which raises them to have a global status

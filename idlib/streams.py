@@ -1,7 +1,38 @@
+"""While the name of the class is Stream, the reality is much closer
+to "a random block of data/code that may or may not be executable" in
+the current runtime. The implication is mostly that it is possible to
+serialize, save-lisp-and-die, etc. something and, given the right
+receiving environment, recover it back to some Turing agentous state
+if you so choose. Thus, in Python, Stream is just a regular old object
+with a few restrictions on its structre.
+
+Another reason why Stream is used as the name is because most of the
+objects that are dereferenced to by persistent identifiers are readonly,
+are only writeable by a select few people, or therwise change with a time
+constant that is significantly longer than life cycle of code that consumes
+them.
+"""
+# NOTE: at the moment, the implementaiton here is not fully homogenous.
+# It is possible for methods to produce something other than another stream.
+# pyontutils.core.OntRes is what we are shooting for, where an identifier
+# identifies multiple streams collectively, they are most distingiushed by
+# the particular type of substream, (e.g. metadata-free, data-homogenous)
+
 import requests
 import idlib
 from idlib import exceptions as exc
 from idlib.utils import cache_result, resolution_chain_responses, StringProgenitor
+
+
+# TODO it seems like there is a little dance going on between identifiers and local names
+# and between identifiers and the actionable form
+# local name < local conventions > canonical globally unique identifier < ??? > actionable form
+# of course that global uniquesness is patently false, it is always global within some
+# set of axioms, i.e. set of string translation rules
+
+# Practically this suggests that it might be possible to set the 'action convetions'
+# for identifiers in a way similar to the local conventions, maybe a set of sane
+# defaults plus a 'get actionable form' or something?
 
 
 class Stream:
@@ -121,6 +152,8 @@ class Stream:
 
         return self._metadata
 
+    # TODO warn about deprecation for pyontutils
+
     @property
     def identifier_bound(self):
         raise NotImplementedError
@@ -133,7 +166,28 @@ class Stream:
         return self.metadata.identifier_version
 
 
-class StreamNoData(Stream):
+### see docs for the trasition grammer
+
+
+class MetadataFree(Stream):
+    # NOT the primary referent of the identifier type in question
+    pass
+
+
+class DataFree(Stream):  # aka DataHeterogeneous
+    # the primary referent of the identifier type in question
+    pass
+
+
+class MetadataBound(Stream):
+    pass
+
+
+class DataHomogenous(Stream):
+    pass
+
+
+class StreamNoData(Stream):  # FIXME should be NoDataHelper
     def data(self):
         raise exc.IdentifierDoesDereferenceToDataError(self)
 
@@ -166,16 +220,36 @@ class StreamUri(Stream):
     Of course then we can't use super() to provide additional information, sigh.
     """
 
-    #_id_class = idlib.Uri
+    # TODO consider whether it makes more sense to invert this so that
+    # actionable forms simply ask identifiers for their representation
+    # in that form ... re: the little dance of asUri -> asUrl
+    # asIdentifiersDotOrg, asN2T, asInterpretedByResolverX etc.
+
+    _id_class = None  # NOTE asssigned to idlib.Uri in idlib.__init__
 
     @property
     def identifier(self):
         return self._identifier
 
+    @property  # FIXME pretty sure this shouldn't be properties due to the accept_mimetypes ...
+    def id_bound_metadata(self):
+        # FIXME this can be id_bound_metadata_free or id_bound_metadata_bound
+        # depending on the returned mime type
+        # TODO check in on pyontutils.core.OntMetaIri
+        raise NotImplementedError
+        return self.metadata_free.identifier  # implicitly free?
+        return self.data_free.metadata_bound.identifier
+
+    identifier_bound_metadata = id_bound_metadata
+
+    def id_bound_data(self):
+        raise NotImplementedError
+
     @cache_result
     def dereference_chain(self):
         # FIXME this is really dereference chain super
-        return tuple(StringProgenitor(resp.url, progenitor=resp) for resp in resolution_chain_responses(self.identifier))
+        return tuple(StringProgenitor(resp.url, progenitor=resp)
+                     for resp in resolution_chain_responses(self.identifier))
 
     @cache_result
     def dereference(self, asType=None):

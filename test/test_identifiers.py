@@ -7,6 +7,8 @@ class StreamHelper:
     stream = None
     ids = tuple()
     def test_stream_sections(self):
+        # TODO run each on of the properties/methods in
+        # a separate loop?
         for i in self.ids:
             d = self.stream(i)
             d.identifier
@@ -67,18 +69,10 @@ class TestRor(StreamHelper, unittest.TestCase):
         assert type(r.identifier) is str
 
     def test_triples(self):
-        import rdflib
-        from pyontutils.namespaces import rdf, rdfs, owl, NIFRID
-        locs = locals()
-        kwargs = {n:locs[n] for n in
-                  ['rdflib',
-                   'rdf',
-                   'rdfs',
-                   'owl',
-                   'NIFRID',]}
-        idlib.Ror.bindRdf(**kwargs)
+        from idlib.formats import rdf as _bind_rdf
         r = idlib.Ror(self.ids[0])
         list(r.triples_gen)
+
 
 class TestStreamUri(StreamHelper, unittest.TestCase):
     stream = idlib.StreamUri
@@ -88,5 +82,3 @@ class TestStreamUri(StreamHelper, unittest.TestCase):
     def test_wat(self):
         ic = self.stream._id_class
         i = ic(self.ids[0])
-        breakpoint()
-        'asdf'

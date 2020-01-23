@@ -2,6 +2,10 @@ import ontquery as oq  # temporary implementation detail
 import idlib
 
 
+# wiki has claims that Orcids are Isnis
+# but I need more information ...
+
+
 class OrcidPrefixes(oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
@@ -14,7 +18,7 @@ OrcidPrefixes({'orcid':'https://orcid.org/',
                'ORCID':'https://orcid.org/',})
 
 
-class OrcidId(oq.OntId):
+class OrcidId(oq.OntId, idlib.Identifier):
     _namespaces = OrcidPrefixes
 
     class OrcidMalformedError(Exception):
@@ -46,5 +50,5 @@ class OrcidId(oq.OntId):
             raise self.OrcidChecksumError(self) from e
 
 
-class Orcid(idlib.Stream):
+class Orcid(idlib.StreamNoData):
     _id_class = OrcidId

@@ -35,7 +35,7 @@ class RorId(
         return m.digest()
 
 
-class Ror(formats.Rdf, idlib.StreamNoData):
+class Ror(formats.Rdf, idlib.NoDataHelper, idlib.Stream):
 
     _id_class = RorId
 
