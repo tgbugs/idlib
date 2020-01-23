@@ -187,7 +187,7 @@ class DataHomogenous(Stream):
     pass
 
 
-class StreamNoData(Stream):  # FIXME should be NoDataHelper
+class HelperNoData:  # FIXME should be
     def data(self):
         raise exc.IdentifierDoesDereferenceToDataError(self)
 

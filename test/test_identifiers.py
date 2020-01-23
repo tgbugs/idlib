@@ -3,7 +3,7 @@ import unittest
 import idlib
 
 
-class StreamHelper:
+class HelperStream:
     stream = None
     ids = tuple()
     def test_stream_sections(self):
@@ -19,13 +19,21 @@ class StreamHelper:
             d.headers()
             d.metadata()
 
-            if not isinstance(d, idlib.StreamNoData):
+            if not isinstance(d, idlib.HelperNoData):
                 d.data()
 
             d.progenitor()  # or is it d.data.progenitor?
 
 
-class TestDoi(StreamHelper, unittest.TestCase):
+
+class TestArk(HelperStream, unittest.TestCase):
+    stream = idlib.Ark
+    ids = [
+        'https://doi.org/10.13003/5jchdy',
+    ]
+
+
+class TestDoi(HelperStream, unittest.TestCase):
     stream = idlib.Doi
     ids = [
         'https://doi.org/10.13003/5jchdy',
@@ -44,7 +52,7 @@ class TestDoi(StreamHelper, unittest.TestCase):
         # but how to see if there is something new?
 
 
-class TestOrcid(StreamHelper, unittest.TestCase):
+class TestOrcid(HelperStream, unittest.TestCase):
     stream = idlib.Orcid
     ids = [
         'https://orcid.org/0000-0002-1825-0097',
@@ -57,7 +65,7 @@ class TestOrcid(StreamHelper, unittest.TestCase):
         assert not bads, str(bads)
 
 
-class TestRor(StreamHelper, unittest.TestCase):
+class TestRor(HelperStream, unittest.TestCase):
     stream = idlib.Ror
     ids = [
         'https://ror.org/0168r3w48',
@@ -74,7 +82,7 @@ class TestRor(StreamHelper, unittest.TestCase):
         list(r.triples_gen)
 
 
-class TestStreamUri(StreamHelper, unittest.TestCase):
+class TestStreamUri(HelperStream, unittest.TestCase):
     stream = idlib.StreamUri
     ids = [
         'https://github.com',

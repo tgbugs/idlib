@@ -50,5 +50,5 @@ class OrcidId(oq.OntId, idlib.Identifier):
             raise self.OrcidChecksumError(self) from e
 
 
-class Orcid(idlib.StreamNoData):
+class Orcid(idlib.HelperNoData, idlib.Stream):
     _id_class = OrcidId
