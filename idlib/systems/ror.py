@@ -8,7 +8,7 @@ import idlib
 from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
-from idlib.utils import cache_result
+from idlib.utils import cache_result, log
 
 
 class _RorPrefixes(oq.OntCuries): pass

@@ -64,6 +64,14 @@ class TestOrcid(HelperStream, unittest.TestCase):
         bads = [orcid for orcid in ids if not orcid.checksumValid]
         assert not bads, str(bads)
 
+    def test_asType(self):
+        import rdflib
+        from idlib.formats import rdf as _bind_rdf
+        o = idlib.Orcid(self.ids[0])
+        nt = o.asType(rdflib.URIRef)
+        breakpoint()
+        assert str(o) != str(nt), 'string representation of streams should not match id'
+
 
 class TestRor(HelperStream, unittest.TestCase):
     stream = idlib.Ror
