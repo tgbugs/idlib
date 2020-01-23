@@ -58,7 +58,7 @@ class Stream:
 
     def asType(self, _class):
         # FIXME not quite ... but close
-        return _class(self)
+        return _class(self.identifier)
 
     def __contains__(self, value):
         return value in self.identifier

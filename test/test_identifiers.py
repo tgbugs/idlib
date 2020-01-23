@@ -79,7 +79,14 @@ class TestRor(HelperStream, unittest.TestCase):
     def test_triples(self):
         from idlib.formats import rdf as _bind_rdf
         r = idlib.Ror(self.ids[0])
-        list(r.triples_gen)
+        trips = list(r.triples_gen)
+
+    def test_asType(self):
+        import rdflib
+        from idlib.formats import rdf as _bind_rdf
+        r = idlib.Ror(self.ids[0])
+        nt = r.asType(rdflib.URIRef)
+        assert str(r) != str(nt), 'string representation of streams should not match id'
 
 
 class TestStreamUri(HelperStream, unittest.TestCase):
