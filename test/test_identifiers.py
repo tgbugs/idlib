@@ -70,7 +70,8 @@ class TestOrcid(HelperStream, unittest.TestCase):
         o = idlib.Orcid(self.ids[0])
         nt = o.asType(rdflib.URIRef)
         breakpoint()
-        assert str(o) != str(nt), 'string representation of streams should not match id'
+        # still haven't decided if this is a good idea or not
+        assert str(o) != str(nt), 'string representation of streams should not match id ???'
 
 
 class TestRor(HelperStream, unittest.TestCase):

@@ -1,14 +1,32 @@
 from pathlib import Path
 import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
-from sparcur.utils import cache  # temp
-from sparcur.config import auth as sauth  # temp
 from pyontutils.namespaces import TEMP  # FIXME VERY temp
 import idlib
 from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
 from idlib.utils import cache_result, log
+
+try:
+    from sparcur.utils import cache  # temp
+    from sparcur.config import auth as sauth  # temp
+except ImportError as e:
+    def cache(*args, return_path=False, **kwargs):
+        def inner(*args, **kwargs):
+            if return_path:
+                return None, None
+            else:
+                return None
+
+        return inner
+
+
+    class _Sauth:
+        def get_path(*args, **kwargs):
+            return ''
+
+    sauth = _Sauth()
 
 
 class _RorPrefixes(oq.OntCuries): pass
