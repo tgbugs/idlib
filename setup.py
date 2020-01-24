@@ -15,7 +15,8 @@ __version__ = find_version('idlib/__init__.py')
 with open('README.md', 'rt') as f:
     long_description = f.read()
 
-tests_require = ['pytest', 'pytest-runner']
+rdf_require = ['neurdflib>=5.0.1', 'pyontutils>=0.1.13']
+tests_require = ['pytest', 'pytest-runner'] + rdf_require
 setup(name='idlib',
       version=__version__,
       description='A library for working with identifiers of all kinds.',
@@ -39,6 +40,7 @@ setup(name='idlib',
       tests_require=tests_require,
       install_requires=['requests'],
       extras_require={'test': tests_require,
+                      'rdf': rdf_require,
                      },
       scripts=[],
       entry_points={'console_scripts': [ ],},
