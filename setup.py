@@ -35,6 +35,8 @@ setup(name='idlib',
       keywords=('python persistent identifiers'),
       packages=[
           'idlib',
+          'idlib.formats',
+          'idlib.systems',
       ],
       python_requires='>=3.6',
       tests_require=tests_require,
