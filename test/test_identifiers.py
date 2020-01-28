@@ -1,5 +1,6 @@
 import hashlib
 import unittest
+import pytest
 import idlib
 
 
@@ -25,7 +26,18 @@ class HelperStream:
             d.progenitor()  # or is it d.data.progenitor?
 
 
+@pytest.mark.skip('Not ready.')
+class TestStreamUri(HelperStream, unittest.TestCase):
+    stream = idlib.StreamUri
+    ids = [
+        'https://github.com',
+    ]
+    def test_wat(self):
+        ic = self.stream._id_class
+        i = ic(self.ids[0])
 
+
+@pytest.mark.skip('Not ready.')
 class TestArk(HelperStream, unittest.TestCase):
     stream = idlib.Ark
     ids = [
@@ -69,7 +81,6 @@ class TestOrcid(HelperStream, unittest.TestCase):
         from idlib.formats import rdf as _bind_rdf
         o = idlib.Orcid(self.ids[0])
         nt = o.asType(rdflib.URIRef)
-        breakpoint()
         # still haven't decided if this is a good idea or not
         assert str(o) != str(nt), 'string representation of streams should not match id ???'
 
@@ -96,13 +107,3 @@ class TestRor(HelperStream, unittest.TestCase):
         r = idlib.Ror(self.ids[0])
         nt = r.asType(rdflib.URIRef)
         assert str(r) != str(nt), 'string representation of streams should not match id'
-
-
-class TestStreamUri(HelperStream, unittest.TestCase):
-    stream = idlib.StreamUri
-    ids = [
-        'https://github.com',
-    ]
-    def test_wat(self):
-        ic = self.stream._id_class
-        i = ic(self.ids[0])

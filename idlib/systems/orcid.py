@@ -2,6 +2,7 @@ from pathlib import Path
 import requests
 import ontquery as oq  # temporary implementation detail
 import idlib
+from idlib import streams
 from idlib.utils import cache_result, log
 from idlib.utils import cache, sauth
 
@@ -55,10 +56,19 @@ class OrcidId(oq.OntId, idlib.Identifier):
         except ValueError as e:
             raise self.OrcidChecksumError(self) from e
 
+    def _checksum(self, cypher):
+        m = cypher()
+        m.update(self.identifier.encode())
+        return m.digest()
 
 
 class Orcid(idlib.HelperNoData, idlib.Stream):
     _id_class = OrcidId
+
+    dereference_chain = streams.StreamUri.dereference_chain
+    dereference = streams.StreamUri.dereference
+    #progenitor = streams.StreamUri.progenitor
+    headers = streams.StreamUri.headers
 
     @cache_result
     def metadata(self):
@@ -78,3 +88,30 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
         self._resp_metadata = requests.get(idq, headers=headers)
         if self._resp_metadata.ok:
             return self._resp_metadata.json()
+
+    @property
+    def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
+        metadata = self.metadata()
+        # wouldn't it be nice if all the metadata schemas had a common field called 'identifier' ?
+        id = metadata['orcid-identifier']['uri']
+        return self._id_class(id)
+
+    identifier_bound_metadata = id_bound_metadata
+
+    @property
+    def id_bound_ver_metadata(self):
+        # TODO
+        return
+
+    identifier_bound_version_metadata = id_bound_ver_metadata
+
+    @cache_result  # FIXME very much must cache these
+    def _checksum(self, cypher):  # FIXME unqualified checksum goes to ... metadata ???
+        # TODO this is a bad checksum
+        m = cypher()
+        metadata = self.metadata()
+        ts_submission = metadata['history']['submission-date']
+        m.update(self.identifier.checksum(cypher))
+        m.update(self.id_bound_metadata.checksum(cypher))
+        m.update(str(ts_submission).encode())  # unix epoch -> ??
+        return m.digest()
