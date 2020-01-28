@@ -7,26 +7,7 @@ from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
 from idlib.utils import cache_result, log
-
-try:
-    from sparcur.utils import cache  # temp
-    from sparcur.config import auth as sauth  # temp
-except ImportError as e:
-    def cache(*args, return_path=False, **kwargs):
-        def inner(*args, **kwargs):
-            if return_path:
-                return None, None
-            else:
-                return None
-
-        return inner
-
-
-    class _Sauth:
-        def get_path(*args, **kwargs):
-            return ''
-
-    sauth = _Sauth()
+from idlib.utils import cache, sauth
 
 
 class _RorPrefixes(oq.OntCuries): pass

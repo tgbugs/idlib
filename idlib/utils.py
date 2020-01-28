@@ -2,8 +2,6 @@ import logging
 from functools import wraps
 import requests
 from idlib import exceptions as exc
-
-
 def makeSimpleLogger(name, level=logging.INFO):
     # TODO use extra ...
     logger = logging.getLogger(name)
@@ -21,6 +19,34 @@ def makeSimpleLogger(name, level=logging.INFO):
 
 log = makeSimpleLogger('idlib')
 logd = log.getChild('data')
+
+
+try:
+    # must come after log to avoid circulary imports (for now)
+    from sparcur.utils import cache  # temp
+    from sparcur.config import auth as sauth  # temp
+except ImportError as e:
+    from functools import wraps
+    def cache(*args, return_path=False, **kwargs):
+        def inner(function):
+            @wraps(function)
+            def superinner(*args, **kwargs):
+                if return_path:
+                    return function(*args, **kwargs), None
+                else:
+                    return function(*args, **kwargs)
+
+            return superinner
+
+        return inner
+
+
+    class _Sauth:
+        def get_path(*args, **kwargs):
+            return ''
+
+    sauth = _Sauth()
+
 
 
 class StringProgenitor(str):
