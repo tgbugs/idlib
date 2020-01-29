@@ -189,11 +189,11 @@ class DataHomogenous(Stream):
 
 class HelperNoData:  # FIXME should be
     def data(self):
-        raise exc.IdentifierDoesDereferenceToDataError(self)
+        raise exc.IdentifierDoesNotDereferenceToDataError(self)
 
     @property
     def id_bound_data(self):
-        raise exc.IdentifierDoesDereferenceToDataError(self)
+        raise exc.IdentifierDoesNotDereferenceToDataError(self)
 
     @property
     def _prgn_metadata(self):

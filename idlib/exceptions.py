@@ -14,7 +14,7 @@ class MalformedIdentifierError(IdlibError):
         NOT create an object of that type, it cannot exist. """
 
 
-class IdentifierDoesDereferenceToDataError(IdlibError):
+class IdentifierDoesNotDereferenceToDataError(IdlibError):
     """ Signal that the identifier in question does not
     dereference to data. Examples are physical sample ids,
     or cooluris, ontology class identifiers, etc.
