@@ -176,6 +176,16 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
         yield from resp_sub.json()['message']['events']
         yield from resp_obj.json()['message']['events']
 
+    # normalized fields
+
+    @property
+    def label(self):
+        m = self.metadata()
+        for k in ('title',):
+            if k in m:
+                return m[k]
+
+    synonyms = tuple()
 
     # alternate representations
 

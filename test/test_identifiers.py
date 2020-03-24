@@ -25,6 +25,11 @@ class HelperStream:
 
             d.progenitor()  # or is it d.data.progenitor?
 
+    def test_asDict(self):
+        for id in self.ids:
+            s = self.stream(id)
+            d = s.asDict()
+
 
 @pytest.mark.skip('Not ready.')
 class TestStreamUri(HelperStream, unittest.TestCase):
@@ -89,12 +94,19 @@ class TestRor(HelperStream, unittest.TestCase):
     stream = idlib.Ror
     ids = [
         'https://ror.org/0168r3w48',
+        'https://ror.org/02dqehb95',
+        'https://ror.org/051fd9666',
     ]
 
     def test_init(self):
         ic = idlib.Ror._id_class
         r = idlib.Ror._id_class(prefix='ror.api', suffix='0168r3w48')
         assert type(r.identifier) is str
+
+    def test_validate(self):
+        for id in self.ids:
+            s = self.stream(id)
+            assert s.checksumValid, f'oops, {id}'
 
     def test_triples(self):
         from idlib.formats import rdf as _bind_rdf

@@ -115,3 +115,30 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
         m.update(self.id_bound_metadata.checksum(cypher))
         m.update(str(ts_submission).encode())  # unix epoch -> ??
         return m.digest()
+
+    # normalized fields
+
+    @property
+    def first_name(self):
+        m = self.metadata()
+        name = m['person']['name']
+        return name['given-names']['value']
+
+    @property
+    def last_name(self):
+        m = self.metadata()
+        name = m['person']['name']
+        return name['family-name']['value']
+
+    @property
+    def label(self):
+        return ' '.join((self.first_name, self.last_name))
+
+    @property
+    def synonyms(self):
+        m = self.metadata()
+        out = []
+        for on in m['person']['other-names']['other-name']:
+            out.append(on['content'])
+
+        return out

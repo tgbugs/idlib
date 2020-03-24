@@ -60,6 +60,15 @@ class Stream:
         # FIXME not quite ... but close
         return _class(self.identifier)
 
+    def asDict(self):
+        return {
+            'type': self.__class__.__name__,  # FIXME this is nice for roundtrip
+            'id': self.identifier,
+            'lable': self.label,
+            'synonyms': self.synonyms,
+            # 'alternate_identifiers': [],  # TODO
+        }
+
     def __contains__(self, value):
         return value in self.identifier
 

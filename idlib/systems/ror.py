@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
@@ -19,10 +20,34 @@ RorPrefixes({'ror': 'https://ror.org/',
 
 class RorId(oq.OntId, idlib.Identifier):
     _namespaces = RorPrefixes
-    # TODO checksumming
     # TODO FIXME for ids like this should we render only the suffix
     # since the prefix is redundant with the identifier type?
     # initial answer: yes
+
+    _index = {c:i for i, c in enumerate('0123456789abcdefghjkmnpqrstvwxyz')}
+    _base = len(_index)
+
+    @property
+    def checksumValid(self):
+        """ <https://github.com/ror-community/ror-api/blob/4f91dcb1c4cdeb1c44c92c8c82dc984081585293/
+            rorapi/management/commands/convertgrid.py#L11> """
+
+        pattern = r'^0([0-9a-z]{6})([0-9]{2})$'
+        match = re.match(pattern, self.suffix)
+        if match is None:
+            return False
+
+        chars, checksum = match.groups()
+
+        # NOTE this assume normalization and downcasing happened in a previous step
+        # NOTE base32 crockford is big endian under string indexing, * self._base
+        # acts to move the previous number(s) to the left by one place in that base
+        number = 0
+        for c in chars:
+            number = number * self._base + self._index[c]
+
+        check = 98 - ((number * 100) % 97)
+        return check == int(checksum)
 
     def _checksum(self, cypher):
         m = cypher()
@@ -40,6 +65,11 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     headers = streams.StreamUri.headers
     #data = idlib.NoDataDereference.data
     #id_bound_data = idlib.NoDataDereference.id_bound_data  # FIXME reuse the Meta and Data from OntRes
+
+
+    @property
+    def checksumValid(self):
+        return self._id_class(self.identifier).checksumValid
 
     @property
     def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
@@ -88,8 +118,6 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     def name(self):
         return self.metadata()['name']
 
-    label = name  # map their schema to ours
-
     def asExternalId(self, id_class):
         eids = self.data['external_ids']
         if id_class._ror_key in eids:
@@ -126,13 +154,6 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             log.critical(metadata)
             raise TypeError('wat')
 
-    def synonyms(self, rdflib):
-        d = self.metadata()
-        # FIXME how to deal with type conversion an a saner way ...
-        yield from [rdflib.Literal(s) for s in d['aliases']]
-        yield from [rdflib.Literal(s) for s in d['acronyms']]
-        yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
-
     def _triples_gen(self,
                      rdflib=None,
                      rdf=None,
@@ -148,9 +169,30 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             yield s, a, o
 
         yield s, rdfs.label, rdflib.Literal(self.label)
-        for o in self.synonyms(rdflib):
+        for o in self.synonyms_rdf(rdflib):
             yield s, NIFRID.synonym, o  # FIXME this looses information about synonym type
 
         # TODO also yeild all the associated grid identifiers
 
+    # normalized fields
 
+    label = name  # map their schema to ours
+
+    def synonyms_rdf(self, rdflib):  # FIXME annoying
+        d = self.metadata()
+        # FIXME how to deal with type conversion an a saner way ...
+        yield from [rdflib.Literal(s) for s in d['aliases']]
+        yield from [rdflib.Literal(s) for s in d['acronyms']]
+        yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
+
+    @property
+    def synonyms(self):
+        out = []
+        m = self.metadata()
+        for a in m['aliases'] + m['acronyms']:
+            out.append(a)
+
+        for l in m['labels']:
+            out.append(l['label'])
+
+        return out
