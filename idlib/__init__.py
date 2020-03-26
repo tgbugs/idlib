@@ -3,8 +3,11 @@ from idlib.streams import (Stream,
                            HelperNoData,
                            StreamUri,)
 from idlib.identifiers import (Identifier,)
-from idlib.local_conventions import (LocalConventions,
-                                     Curies,
+
+import idlib.conventions.type  # LOL PYTHON
+import idlib.conventions.local  # LOL PYTHON
+from idlib.conventions.core import ConventionsLocal
+from idlib.conventions.local import (Curies,
                                      QNames,)
 from idlib.from_oq import (Auto,
                            Pio,

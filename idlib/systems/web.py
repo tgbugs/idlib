@@ -18,7 +18,7 @@ class Uri(Iri):
 
 
 class CompactifiedTemplate(Uri):
-    _local_conventions = idlib.LocalConventions()
+    _local_conventions = idlib.ConventionsLocal()
     # maybe simpler to implement as a
     # lifting rule over local conventions
     # which raises them to have a global status

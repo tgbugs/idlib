@@ -35,6 +35,7 @@ setup(name='idlib',
       keywords=('python persistent identifiers'),
       packages=[
           'idlib',
+          'idlib.conventions',
           'idlib.formats',
           'idlib.systems',
       ],
