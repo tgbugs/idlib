@@ -168,7 +168,7 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
             mailto = f'mailto={email}'
         except aug.exceptions.NotInRepoError:
             # TODO failover to the git repo api?
-            mailto = 'tgbugs+sparcur-no-git@gmail.com'
+            mailto = 'tgbugs+idlib-no-git@gmail.com'
 
         resp_obj = requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
         resp_sub = requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')

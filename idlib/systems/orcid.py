@@ -3,9 +3,9 @@ import requests
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
+from idlib.cache import cache
 from idlib.utils import cache_result, log
-from idlib.utils import cache, sauth
-
+from idlib.config import auth
 
 
 # wiki has claims that Orcids are Isnis
@@ -78,7 +78,7 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
         self._path_metadata = path
         return metadata
 
-    @cache(Path(sauth.get_path('cache-path'), 'orcid_json'), create=True, return_path=True)
+    @cache(auth.get_path('cache-path') / 'orcid_json', create=True, return_path=True)
     def _metadata(self, suffix):
         # TODO data endpoint prefix ??
         # vs data endpoint pattern ...

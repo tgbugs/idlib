@@ -2,13 +2,13 @@ import re
 from pathlib import Path
 import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
-from pyontutils.namespaces import TEMP  # FIXME VERY temp
 import idlib
 from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
+from idlib.cache import cache
 from idlib.utils import cache_result, log
-from idlib.utils import cache, sauth
+from idlib.config import auth
 
 
 class _RorPrefixes(oq.OntCuries): pass
@@ -104,7 +104,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         self._path_metadata = path
         return metadata
 
-    @cache(Path(sauth.get_path('cache-path'), 'ror_json'), create=True, return_path=True)
+    @cache(auth.get_path('cache-path') / 'ror_json', create=True, return_path=True)
     def _metadata(self, suffix):
         # TODO data endpoint prefix ??
         # vs data endpoint pattern ...
@@ -134,11 +134,11 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             return id_class(eid)
 
     _type_map = {
-        'Education': TEMP.Institution,
-        'Healthcare': TEMP.Institution,
-        'Facility': TEMP.CoreFacility,
-        'Nonprofit': TEMP.Nonprofit,
-        'Other': TEMP.Institution,
+        'Education':  'Institution',
+        'Healthcare': 'Institution',
+        'Facility':   'CoreFacility',
+        'Nonprofit':  'Nonprofit',
+        'Other':      'Institution',
     }
     @property
     def institutionTypes(self):
@@ -160,12 +160,14 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
                      rdfs=None,
                      owl=None,
                      NIFRID=None,
+                     TEMP=None,
                      **kwargs):
         """ produce a triplified version of the record """
         s = self.asType(rdflib.URIRef)
         a = rdf.type
         yield s, a, owl.NamedIndividual
-        for o in self.institutionTypes:
+        for osuffix in self.institutionTypes:
+            o = TEMP[osuffix]
             yield s, a, o
 
         yield s, rdfs.label, rdflib.Literal(self.label)

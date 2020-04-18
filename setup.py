@@ -15,7 +15,7 @@ __version__ = find_version('idlib/__init__.py')
 with open('README.md', 'rt') as f:
     long_description = f.read()
 
-rdf_require = ['neurdflib>=5.0.1', 'pyontutils>=0.1.13']
+rdf_require = ['rdflib>=5.0.0rc1', 'pyontutils>=0.1.13']
 tests_require = ['pytest', 'pytest-runner'] + rdf_require
 setup(name='idlib',
       version=__version__,
@@ -31,6 +31,7 @@ setup(name='idlib',
           'License :: OSI Approved :: MIT License',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
       ],
       keywords=('python persistent identifiers'),
       packages=[
@@ -41,7 +42,7 @@ setup(name='idlib',
       ],
       python_requires='>=3.6',
       tests_require=tests_require,
-      install_requires=['requests'],
+      install_requires=['orthauth>=0.0.11', 'requests'],
       extras_require={'test': tests_require,
                       'rdf': rdf_require,
                      },
