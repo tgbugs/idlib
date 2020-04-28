@@ -4,9 +4,10 @@ import idlib
 from idlib import streams
 from idlib import exceptions as exc
 from idlib.utils import cache_result
+from idlib import conventions as conv
 
 
-class _DoiPrefixes(oq.OntCuries):
+class _DoiPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
     _n_to_p = {}
@@ -17,10 +18,13 @@ class _DoiPrefixes(oq.OntCuries):
 _DoiPrefixes({'DOI':'https://doi.org/',
               'doi':'https://doi.org/',})
 
+
 class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a stream
     """ The actual representation of the DOI, but we'll ignore that for now """
     _namespaces = _DoiPrefixes
+    _local_conventions = _namespaces
     _id_class = str  # eventually we have to drop down to something
+    canonical_regex = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
 
     def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):
         if doi_in_various_states_of_mangling is None and iri is not None:
@@ -80,6 +84,7 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
 
     _family = idlib.families.ISO
     _id_class = DoiId
+
     dereference_chain = streams.StreamUri.dereference_chain
     dereference = streams.StreamUri.dereference
     progenitor = streams.StreamUri.progenitor

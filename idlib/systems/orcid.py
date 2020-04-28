@@ -6,13 +6,14 @@ from idlib import streams
 from idlib.cache import cache
 from idlib.utils import cache_result, log
 from idlib.config import auth
+from idlib import conventions as conv
 
 
 # wiki has claims that Orcids are Isnis
 # but I need more information ...
 
 
-class OrcidPrefixes(oq.OntCuries):
+class OrcidPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
     _n_to_p = {}
@@ -27,6 +28,9 @@ OrcidPrefixes({'orcid': 'https://orcid.org/',
 
 class OrcidId(oq.OntId, idlib.Identifier):
     _namespaces = OrcidPrefixes
+    _local_conventions = _namespaces
+    canonical_regex = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
+                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
 
     class OrcidMalformedError(Exception):
         """ WHAT HAVE YOU DONE!? """

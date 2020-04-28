@@ -39,6 +39,11 @@ class Stream:
 
     _id_class = None
 
+    @classmethod
+    def fromJson(cls, blob):
+        # TODO validation ...
+        return cls(blob['id'])
+
     def __init__(self, identifier_or_id_as_string=None, *args, **kwargs):
         if isinstance(self, idlib.Identifier):
             # stream should always come last in the mro so it will hit object
@@ -60,14 +65,39 @@ class Stream:
         # FIXME not quite ... but close
         return _class(self.identifier)
 
+    def asCell(self, sep='|'):
+        """ As a cell in a table. """
+        # TODO Distinct from asTabular in that asTabular is probably a row?
+        if hasattr(self, '_id_class') and self._id_class:
+            local = self.identifier.asLocal()
+            if not self.label:
+                return local
+
+            return self.label + sep + local
+
+        else:
+            # FIXME this needs some extension mechanism ...
+            raise NotImplementedError('TODO as needed')
+
     def asDict(self):
-        return {
-            'type': self.__class__.__name__,  # FIXME this is nice for roundtrip
-            'id': self.identifier,
-            'lable': self.label,
-            'synonyms': self.synonyms,
-            # 'alternate_identifiers': [],  # TODO
-        }
+        if hasattr(self, '_id_class') and self._id_class:
+            out = {
+                'type': 'identifier',
+                'system': self.__class__.__name__,
+                'id': self.identifier,
+                'label': self.label,
+                # 'alternate_identifiers': [],  # TODO
+            }
+            if hasattr(self, 'synonyms') and self.synonyms:
+                out['synonyms'] = self.synonyms
+
+        # TODO other stream types e.g. pathlib.Path ... sigh CL MOP would be so useful here
+        else:
+            out = {'type': 'stream',
+                   'system': self.__class__.__name__,  # FIXME key name ...
+                   'id': self.identifier,}
+
+        return out
 
     def __contains__(self, value):
         return value in self.identifier

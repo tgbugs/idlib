@@ -9,23 +9,31 @@ from idlib import exceptions as exc
 from idlib.cache import cache
 from idlib.utils import cache_result, log
 from idlib.config import auth
+from idlib import conventions as conv
 
 
-class _RorPrefixes(oq.OntCuries): pass
-RorPrefixes = _RorPrefixes.new()
-RorPrefixes({'ror': 'https://ror.org/',
-             'ror.api': 'https://api.ror.org/organizations/',
-})
+class _RorPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+_RorPrefixes({'ror': 'https://ror.org/',
+             'ror.api': 'https://api.ror.org/organizations/',})
 
 
 class RorId(oq.OntId, idlib.Identifier):
-    _namespaces = RorPrefixes
+    _namespaces = _RorPrefixes
+    _local_conventions = _namespaces
     # TODO FIXME for ids like this should we render only the suffix
     # since the prefix is redundant with the identifier type?
     # initial answer: yes
 
     _index = {c:i for i, c in enumerate('0123456789abcdefghjkmnpqrstvwxyz')}
     _base = len(_index)
+    canonical_regex = '^https://ror.org/0[0-9a-z]{6}[0-9]{2}$'
 
     @property
     def checksumValid(self):

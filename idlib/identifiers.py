@@ -78,4 +78,4 @@ class Identifier(idlib.Stream):  # TODO decide if str should be base ...
         if conventions is None:
             conventions = self._local_conventions
 
-        return conventions(self)
+        return conventions.asLocal(self)

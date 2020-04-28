@@ -2,6 +2,7 @@ import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
 from idlib.utils import cache_result
+from idlib import conventions as conv
 
 
 # from neurondm.simple
@@ -62,18 +63,26 @@ class URIInstrumentation(oq.terms.InstrumentedIdentifier):
             return uri  # FIXME TODO identifier it
 
 
-class _PioPrefixes(oq.OntCuries): pass
-PioPrefixes = _PioPrefixes.new()
-PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
-             'pio.edit': 'https://www.protocols.io/edit/',  # sigh
-             'pio.private': 'https://www.protocols.io/private/',
-             'pio.fileman': 'https://www.protocols.io/file-manager/',
-             'pio.api': 'https://www.protocols.io/api/v3/protocols/',
+class _PioPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+_PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
+              'pio.edit': 'https://www.protocols.io/edit/',  # sigh
+              'pio.private': 'https://www.protocols.io/private/',
+              'pio.fileman': 'https://www.protocols.io/file-manager/',
+              'pio.api': 'https://www.protocols.io/api/v3/protocols/',
 })
 
 
 class PioId(oq.OntId, idlib.Identifier):
-    _namespaces = PioPrefixes
+    _namespaces = _PioPrefixes
+    _local_conventions = _namespaces
+    canonical_regex = '^https://www.protocols.io/(view|edit|private|file-manager|api/v3/protocols)/'
 
     def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
         if curie_or_iri is None and iri:
@@ -159,27 +168,33 @@ class Pio(idlib.Stream):
 
     @property
     def hasVersions(self):
-        return bool(self.data['has_versions'])
+        return bool(self.data()['has_versions'])
 
     @property
     def versions(self):
-        yield from self.data['versions']  # TODO ...
+        yield from self.data()['versions']  # TODO ...
 
     @property
     def created(self):
         # FIXME I don't think this is TZLOCAL for any reason beyond accident of circumstances
         # I think this is PDT i.e. the location of the protocols.io servers
         tzl = TZLOCAL()
-        return datetime.fromtimestamp(self.data['created_on'], tz=tzl)
+        return datetime.fromtimestamp(self.data()['created_on'], tz=tzl)
 
     @property
     def updated(self):
         tzl = TZLOCAL()
-        return datetime.fromtimestamp(self.data['changed_on'], tz=tzl)
+        return datetime.fromtimestamp(self.data()['changed_on'], tz=tzl)
+
+    @property
+    def title(self):
+        return self.data()['title']
+
+    label = title
 
     @property
     def creator(self):
-        return PioUserInst('pio.user:' + self.data['creator']['username'])
+        return PioUserInst('pio.user:' + self.data()['creator']['username'])
 
     @property
     def authors(self):
@@ -187,15 +202,22 @@ class Pio(idlib.Stream):
             yield PioUserInst(prefix='pio.user', suffix=u['username'])
 
 
-class _PioUserPrefixes(oq.OntCuries): pass
-PioUserPrefixes = _PioUserPrefixes.new()
-PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
-                 'pio.api.user': 'https://www.protocols.io/api/v3/researchers/',
+class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+_PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
+                  'pio.api.user': 'https://www.protocols.io/api/v3/researchers/',
 })
 
 
 class PioUserId(oq.OntId):
-    _namespaces = PioUserPrefixes
+    _namespaces = _PioUserPrefixes
+    _local_conventions = _namespaces
 
 
 class PioUser(idlib.Stream):
