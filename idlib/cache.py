@@ -5,6 +5,7 @@ from pathlib import Path
 from functools import wraps
 from .utils import log
 
+COOLDOWN = '__idlib.cache_cooldown'
 
 _type_order = (
     bool, int, float, bytes, str, tuple, list, set, dict, object, type, None
@@ -87,15 +88,27 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
         def superinner(*args, **kwargs):
             filename = cache_hash(spector(*args, ____fn=fn, **kwargs))
             filepath = folder / filename
-            if filepath.exists():
+            fe = filepath.exists()
+            if fe:
                 log.debug(f'deserializing from {filepath}')
                 with open(filepath, read_mode) as f:
                     output = deserialize(f)
+
             else:
                 output = function(*args, **kwargs)
                 if output is not None:
                     with open(filepath, write_mode) as f:
                         serialize(output, f)
+
+            if isinstance(output, dict) and COOLDOWN in output:
+                # a hack to put a dummy variable in the cache
+                # to prevent retrying on a persistent failure case
+                if fe:
+                    reason = output[COOLDOWN]
+                    log.debug('currently in cooldown for {args} {kwargs} due to {reason}')
+
+                # TODO add timing or remove cooldowns function
+                output = None
 
             if return_path:
                 return output, filepath

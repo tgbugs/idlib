@@ -6,10 +6,10 @@ import idlib
 from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
+from idlib import conventions as conv
 from idlib.cache import cache
 from idlib.utils import cache_result, log
 from idlib.config import auth
-from idlib import conventions as conv
 
 
 class _RorPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):

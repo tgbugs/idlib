@@ -3,8 +3,10 @@ import ontquery as oq  # temp implementation detail
 import idlib
 from idlib import streams
 from idlib import exceptions as exc
-from idlib.utils import cache_result
 from idlib import conventions as conv
+from idlib.cache import cache
+from idlib.utils import cache_result, log
+from idlib.config import auth
 
 
 class _DoiPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
@@ -75,7 +77,6 @@ class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a s
                                                f'to be of type {self.__class__}')
 
 
-
 # have to exclude, idlib.Uri, idlib.Handle because they are the identifiers NOT the
 # streams, and the streams aren't just strings, oops!
 # BUT WAIT: maybe we DO want to conflate them!
@@ -130,6 +131,13 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
 
     @cache_result
     def metadata(self):
+        metadata, path = self._metadata()
+        # oh look an immediate violation of the URI assumption ...
+        self._path_metadata = path
+        return metadata
+
+    @cache(auth.get_path('cache-path') / 'doi_json', create=True, return_path=True)
+    def _metadata(self):
         # e.g. crossref, datacite, etc.
         # so this stuff isnt quite to the spec that is doccumented here
         # https://crosscite.org/docs.html
@@ -161,7 +169,14 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
     def ttl(self):  # this is another potential way to deal with mimetypes
         # both datacite and crossref produce in turtle
         resp = requests.get(self.identifier, headers={'Accept': 'text/turtle'})
-        return resp.text
+        self._ttl_resp = resp
+        ct = resp.headers['Content-Type']
+        if 'text/html' in ct:
+            # sigh blackfynn
+            log.warning(f'{resp.url} is not turtle it is {ct}')  # FIXME duplicate log messages happen here
+            return
+        else:
+            return resp.text
 
     def metadata_events(self):
         """ metadata about dois from the crossref events api """

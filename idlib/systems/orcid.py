@@ -3,10 +3,10 @@ import requests
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
+from idlib import conventions as conv
 from idlib.cache import cache
 from idlib.utils import cache_result, log
 from idlib.config import auth
-from idlib import conventions as conv
 
 
 # wiki has claims that Orcids are Isnis
@@ -126,17 +126,23 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
     def first_name(self):
         m = self.metadata()
         name = m['person']['name']
-        return name['given-names']['value']
+        if name:  # FIXME cull?
+            gn = name['given-names']
+            if gn:
+                return gn['value']
 
     @property
     def last_name(self):
         m = self.metadata()
         name = m['person']['name']
-        return name['family-name']['value']
+        if name:  # FIXME cull?
+            fn = name['family-name']
+            if fn:
+                return fn['value']
 
     @property
     def label(self):
-        return ' '.join((self.first_name, self.last_name))
+        return ' '.join([n for n in (self.first_name, self.last_name) if n is not None])
 
     @property
     def synonyms(self):

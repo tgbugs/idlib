@@ -1,8 +1,8 @@
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
-from idlib.utils import cache_result
 from idlib import conventions as conv
+from idlib.utils import cache_result
 
 
 # from neurondm.simple
@@ -88,7 +88,11 @@ class PioId(oq.OntId, idlib.Identifier):
         if curie_or_iri is None and iri:
             curie_or_iri = iri
 
-        if curie_or_iri is not None:
+        if isinstance(curie_or_iri, idlib.Stream):
+            normalized = curie_or_iri.identifier.identifier
+        elif isinstance(curie_or_iri, idlib.Identifier):
+            normalized = curie_or_iri.identifier
+        elif curie_or_iri is not None:
             # FIXME trailing nonsense for abstract etc
             normalized = curie_or_iri.replace('://protocols.io', '://www.protocols.io')
         else:
@@ -188,7 +192,11 @@ class Pio(idlib.Stream):
 
     @property
     def title(self):
-        return self.data()['title']
+        data = self.data()
+        if data:
+            title = data['title']
+            if title:
+                return title
 
     label = title
 
