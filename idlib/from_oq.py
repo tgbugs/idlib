@@ -1,6 +1,7 @@
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
+from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.utils import cache_result
 
@@ -73,6 +74,7 @@ class _PioPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
 
 _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
               'pio.edit': 'https://www.protocols.io/edit/',  # sigh
+              'pio.run': 'https://www.protocols.io/run/',  # sigh
               'pio.private': 'https://www.protocols.io/private/',
               'pio.fileman': 'https://www.protocols.io/file-manager/',
               'pio.api': 'https://www.protocols.io/api/v3/protocols/',
@@ -98,10 +100,16 @@ class PioId(oq.OntId, idlib.Identifier):
         else:
             normalized = None
 
-        self = super().__new__(cls, curie_or_iri=normalized, iri=iri,
-                               prefix=prefix, suffix=suffix)
+        self = super().__new__(cls,
+                                curie_or_iri=normalized,
+                                iri=iri,
+                                prefix=prefix,
+                                suffix=suffix)
 
         self._unnormalized = curie_or_iri if curie_or_iri else self.iri
+        if self.prefix not in self._local_conventions:
+            raise exc.MalformedIdentifierError(
+                f'Not a protocols.io id: {self}')
         return self
         
     @property
@@ -116,6 +124,10 @@ class PioId(oq.OntId, idlib.Identifier):
         if self.suffix is None:
             breakpoint()
         return self.suffix.rsplit('/', 1)[0] if '/' in self.suffix else self.suffix
+
+    @property
+    def slug_tail(self):
+        return self.slug.rsplit('-', 1)[-1]
 
 
 class Pio(idlib.Stream):
@@ -143,6 +155,10 @@ class Pio(idlib.Stream):
         return self.identifier.slug
 
     @property
+    def slug_tail(self):
+        return self.identifier.slug_tail
+
+    @property
     def doi(self):
         data = self.data()
         if data:
@@ -153,11 +169,12 @@ class Pio(idlib.Stream):
     @property
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
-        data = self.data
+        data = self.data()
         if data:
             uri = data['uri']
             if uri:
-                return self.__class__(prefix='pio.view', suffix=uri)
+                nid = self._id_class(prefix='pio.view', suffix=uri)
+                return self.__class__(nid)
 
     def data(self):
         if not hasattr(self, '_data'):
