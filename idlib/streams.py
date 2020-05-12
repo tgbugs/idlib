@@ -21,7 +21,8 @@ them.
 import requests
 import idlib
 from idlib import exceptions as exc
-from idlib.utils import cache_result, resolution_chain_responses, StringProgenitor
+from idlib.utils import cache_result, resolution_chain_responses
+from idlib.utils import StringProgenitor, log
 
 
 # TODO it seems like there is a little dance going on between identifiers and local names
@@ -84,7 +85,11 @@ class Stream:
         # TODO Distinct from asTabular in that asTabular is probably a row?
         if hasattr(self, '_id_class') and self._id_class:
             local = self.identifier.asLocal()
-            if not self.label:
+            try:
+                if not self.label:
+                    return local
+            except exc.ResolutionError as e:
+                log.exception(e)
                 return local
 
             return self.label + sep + local
