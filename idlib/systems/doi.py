@@ -102,6 +102,11 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
         else:
             return False  # FIXME TODO
 
+    def progenitor(self):
+        self.metadata()
+        meta = self._resp_metadata if hasattr(self, '_resp_metadata') else self._path_metadata
+        return self.dereference_chain(), meta
+
     @property
     def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
         metadata = self.metadata()
