@@ -121,6 +121,11 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         self._resp_metadata = requests.get(idq)
         if self._resp_metadata.ok:
             return self._resp_metadata.json()
+        else:
+            try:
+                self._resp_metadata.raise_for_status()
+            except BaseException as e:
+                raise exc.ResolutionError(identifier) from e
 
     @property
     def name(self):
@@ -170,7 +175,8 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
                      NIFRID=None,
                      TEMP=None,
                      **kwargs):
-        """ produce a triplified version of the record """
+        """ implementation of method to produce a
+            triplified version of the record """
         s = self.asType(rdflib.URIRef)
         a = rdf.type
         yield s, a, owl.NamedIndividual
@@ -206,3 +212,8 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             out.append(l['label'])
 
         return out
+
+    # alternate representations
+
+    def asUri(self):
+        return self.identifier.iri

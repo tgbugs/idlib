@@ -1,6 +1,7 @@
 import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
 import idlib
+from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
@@ -80,7 +81,7 @@ class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a s
 # have to exclude, idlib.Uri, idlib.Handle because they are the identifiers NOT the
 # streams, and the streams aren't just strings, oops!
 # BUT WAIT: maybe we DO want to conflate them!
-class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' issue
+class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' issue
     """ The DOI stream. """
 
     _family = idlib.families.ISO
@@ -131,13 +132,13 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
 
     @cache_result
     def metadata(self):
-        metadata, path = self._metadata()
+        metadata, path = self._metadata(self.identifier)
         # oh look an immediate violation of the URI assumption ...
         self._path_metadata = path
         return metadata
 
     @cache(auth.get_path('cache-path') / 'doi_json', create=True, return_path=True)
-    def _metadata(self):
+    def _metadata(self, identifier):
         # e.g. crossref, datacite, etc.
         # so this stuff isnt quite to the spec that is doccumented here
         # https://crosscite.org/docs.html
@@ -147,12 +148,15 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
             'application/vnd.datacite.datacite+json, '  # first so it can fail
             'application/json, '  # undocumented fallthrough for crossref ?
         )
-        resp = requests.get(self.identifier, headers={'Accept': accept})
+        resp = requests.get(identifier, headers={'Accept': accept})
         self._resp_metadata = resp  # FIXME for progenitor
         if resp.ok:
             return resp.json()
         else:
-            resp.raise_for_status()  # TODO see if this is really a good idea or not
+            try:
+                self._resp_metadata.raise_for_status()
+            except BaseException as e:
+                raise exc.ResolutionError(identifier) from e
 
     @cache_result  # FIXME very much must cache these
     def _checksum(self, cypher):  # FIXME unqualified checksum goes to ... metadata ???
@@ -199,15 +203,80 @@ class Doi(idlib.Stream):  # FIXME that 'has canonical representaiton as a uri' i
     # normalized fields
 
     @property
-    def label(self):
+    def title(self):
         m = self.metadata()
-        for k in ('title',):
-            if k in m:
-                return m[k]
+        if 'title' in m:
+            return m['title']
 
+        elif 'titles' in m and m['titles']:
+            # arbitrary choice to return the first
+            return m['titles'][0]['title']
+
+    label = title
     synonyms = tuple()
+
+    @property
+    def description(self):
+        m = self.metadata()
+        breakpoint()
+
+    @property
+    def resourceTypeGeneral(self):
+        m = self.metadata()
+        rtg = 'resourceTypeGeneral' 
+        if 'types' in m and rtg in m['types']:
+            return m['types'][rtg]
+
+    @property
+    def category(self):  # FIXME naming
+        """ this is the idlib normalized type of the dereferenced object
+        """
+            # using category since it matches well with the ontology and registry naming
+            # and avoids collisions with type, resourceType, etc.
+
+        rtg = self.resourceTypeGeneral
+        if rtg:
+            return rtg
+
+        m = self.metadata()
+        if 'source' in m and m['source'] == 'Crossref':
+            # FIXME sigh ... need representaitons for each
+            # type of metadata to avoid this nonsense
+
+            # XXX WARNING the type field on protocols.io records is WRONG
+            # dataset was listed because there was no other type that was close
+            # so consider that field garbage
+            ct = 'container-title'
+            if ct in m and m[ct] == 'protocols.io':
+                return 'Protocol'
+
+            aj = 'article-journal'
+            if 'type' in m and m['type'] == aj:
+                return 'ArticleJournal'
+
+    # output streams
+
+    def _triples_gen(self,
+                     rdflib=None,
+                     rdf=None,
+                     rdfs=None,
+                     owl=None,
+                     NIFRID=None,
+                     TEMP=None,
+                     **kwargs):
+        """ implementation of method to produce a
+            triplified version of the record """
+        s = self.asType(rdflib.URIRef)
+        yield s, rdf.type, owl.NamedIndividual
+        if self.category:
+            yield s, rdf.type, rdflib.URIRef(TEMP[self.category])  # FIXME TODO
+
+        yield s, rdfs.label, rdflib.Literal(self.label)
 
     # alternate representations
 
     def asHandle(self):
         return idlib.Handle(self.suffix)
+
+    def asUri(self):
+        return self.identifier.iri

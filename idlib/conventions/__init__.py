@@ -1,3 +1,6 @@
+from .core import Identity
+
+
 class QnameAsLocalHelper:
     """ hack for classmethod inheritance sigh """
 

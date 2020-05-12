@@ -12,6 +12,6 @@ class Rdf:
     def bindRdf(cls, **kwargs):
         cls._triples_gen_kwargs = kwargs
 
-    @property
+    @property  # FIXME pretty sure this can't be a property if we do this right
     def triples_gen(self):  # FIXME how to do this without rdflib live ... re: pysercomb
         yield from self._triples_gen(**self._triples_gen_kwargs)

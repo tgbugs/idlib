@@ -42,9 +42,14 @@ class Stream:
     @classmethod
     def fromJson(cls, blob):
         # TODO validation ...
-        return cls(blob['id'])
+        identifier = blob['id']
+        if isinstance(identifier, cls):
+            return identifier
+        else:
+            return cls(identifier)
 
     def __init__(self, identifier_or_id_as_string=None, *args, **kwargs):
+        # FIXME or identifier, string, or another stream
         if isinstance(self, idlib.Identifier):
             # stream should always come last in the mro so it will hit object
             super().__init__() #identifier_or_id_as_string, *args, **kwargs)
@@ -59,11 +64,20 @@ class Stream:
                     # check their own inputs
                     raise TypeError('identifier_or_id_as_string may not be None')
 
-                self._identifier = self._id_class(identifier_or_id_as_string)
+                if isinstance(identifier_or_id_as_string, Stream):  # FIXME not quite right
+                    self._identifier = identifier_or_id_as_string.identifier
+                else:
+                    self._identifier = self._id_class(identifier_or_id_as_string)
 
     def asType(self, _class):
         # FIXME not quite ... but close
-        return _class(self.identifier)
+        if hasattr(self, '_id_class'):
+            if self._id_class == str:
+                return _class(self.identifier)
+            else:
+                return self.identifier.asType(_class)
+        else:
+            return _class(self.identifier)
 
     def asCell(self, sep='|'):
         """ As a cell in a table. """
@@ -79,17 +93,29 @@ class Stream:
             # FIXME this needs some extension mechanism ...
             raise NotImplementedError('TODO as needed')
 
-    def asDict(self):
+    def asDict(self, include_description=False):
         if hasattr(self, '_id_class') and self._id_class:
             out = {
                 'type': 'identifier',
                 'system': self.__class__.__name__,
-                'id': self.identifier,
-                'label': self.label,
+                #'id': self.identifier,
+                'id': self,  # XXX NOTE THE TRADEOFF HERE, this preserves stream access
                 # 'alternate_identifiers': [],  # TODO
             }
-            if hasattr(self, 'synonyms') and self.synonyms:
-                out['synonyms'] = self.synonyms
+
+            if self.metadata() is not None:
+                out['label'] = self.label
+                if hasattr(self, 'category') and self.category:
+                    out['category'] = self.category
+
+                if hasattr(self, 'synonyms') and self.synonyms:
+                    out['synonyms'] = self.synonyms
+
+                if include_description and hasattr(self, 'description') and self.description:
+                    out['description'] = self.description
+
+            else:
+                out['errors'] = [{'message': 'No metadata found.'}]
 
         # TODO other stream types e.g. pathlib.Path ... sigh CL MOP would be so useful here
         else:

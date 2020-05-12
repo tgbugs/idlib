@@ -59,7 +59,7 @@ class Identifier(idlib.Stream):  # TODO decide if str should be base ...
         #return identifier
 
     def __new__(cls, *args, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+        return super().__new__(cls)
 
     def __init__(self, *args, **kwargs):
         return super().__init__(*args, **kwargs)

@@ -2,6 +2,16 @@ class Conventions:
     """ local or type conventions """
 
 
+class Identity(Conventions):
+
+    @staticmethod
+    def asLocal(identifier):
+        if not isinstance(identifier, str):
+            return Identity.asLocal(identifier.identifier)
+        else:
+            return identifier
+
+
 class ConventionsType(Conventions):
     """ type conventions """
 

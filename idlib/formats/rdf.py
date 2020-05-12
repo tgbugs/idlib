@@ -1,5 +1,6 @@
 import idlib
 import rdflib
+from . import Rdf
 from pyontutils.namespaces import rdf, rdfs, owl, NIFRID, TEMP
 # FIXME this is clearly backwards, pyontutils should be importing from here
 
@@ -13,4 +14,6 @@ kwargs = {n:locs[n] for n in
            'TEMP',]}
 
 # bindRdf to any class that needs it
-idlib.Ror.bindRdf(**kwargs)
+Rdf.bindRdf(**kwargs)
+#idlib.Ror.bindRdf(**kwargs)
+#idlib.Doi.bindRdf(**kwargs)

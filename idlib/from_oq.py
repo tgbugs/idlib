@@ -187,6 +187,8 @@ class Pio(idlib.Stream):
 
         return self._data
 
+    metadata = data  # FIXME
+
     @property
     def hasVersions(self):
         return bool(self.data()['has_versions'])
