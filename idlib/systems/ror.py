@@ -67,6 +67,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
 
     _id_class = RorId
 
+    identifier_actionable = streams.StreamUri.identifier_actionable
     dereference_chain = streams.StreamUri.dereference_chain
     dereference = streams.StreamUri.dereference
     #progenitor = streams.StreamUri.progenitor

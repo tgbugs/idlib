@@ -87,6 +87,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
     _family = idlib.families.ISO
     _id_class = DoiId
 
+    identifier_actionable = streams.StreamUri.identifier_actionable
     dereference_chain = streams.StreamUri.dereference_chain
     dereference = streams.StreamUri.dereference
     progenitor = streams.StreamUri.progenitor

@@ -139,6 +139,7 @@ class Pio(idlib.Stream):
     _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
     # but what do you want :/
 
+    identifier_actionable = streams.StreamUri.identifier_actionable
     dereference_chain = streams.StreamUri.dereference_chain
     dereference = streams.StreamUri.dereference
     progenitor = streams.StreamUri.progenitor
@@ -302,4 +303,5 @@ class Auto:
         if 'protocols.io' in something:
             return idlib.Pio(something)
 
-        return oq.OntId(something)  # FIXME idlib.StreamUri ?
+        return oq.OntId(something)
+        return OntTerm(something)  # use the better local version of OntTerm

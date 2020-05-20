@@ -119,3 +119,15 @@ class TestRor(HelperStream, unittest.TestCase):
         r = idlib.Ror(self.ids[0])
         nt = r.asType(rdflib.URIRef)
         assert str(r) != str(nt), 'string representation of streams should not match id'
+
+
+class TestRrid(HelperStream, unittest.TestCase):
+    stream = idlib.Rrid
+    ids = [
+        'RRID:AB_1234567',
+        'RRID:IMSR_JAX:000664',
+        'RRID:SCR_001337',
+        'RRID:RGD_10395233',
+        'RRID:Addgene_19640',
+        #'RRID:NCBITaxon_9606',  # TODO not in resolver yet
+    ]

@@ -143,7 +143,20 @@ class Stream:
 
     @identifier.setter
     def identifier(self, value):
-        raise NotImplementedError("You probably meant to set self._identifier?")  # probably should never allow this ...
+        raise NotImplementedError('You probably meant to set self._identifier?')  # probably should never allow this ...
+
+    @property
+    def identifier_actionable(self):
+        """ The 'resolvable' or actionable form of an identifier
+            where actionable is defined by specification of the system
+            NOT of the current context in which an identifier is being used """
+
+        # in URI based systems this will just be the identifier
+        # decoupling this important for allowing identifiers to
+        # have canonical regex that are resolver independent
+
+        # TODO identifier_actionable_resolver(self, resolver) or similar
+        raise NotImplementedError('Implement in subclass')
 
     def checksum(self, cypher=None):  # FIXME default cypher value
         if not hasattr(self, '__checksum'):  # NOTE can set __checksum on the fly
@@ -174,7 +187,24 @@ class Stream:
         raise NotImplementedError
 
     def dereference(self, asType=None):
-        """ Many identifier systems have native dereferincing semantics """
+        """ Many identifier systems have native dereferincing semantics
+
+            This particular dereferencing refers ONLY to the dereferencing
+            of one identifier into another identifier stream, NOT the contents
+            of that stream. This is the "default" dereferencing behavior of the
+            _system_ NOT of the identifier. """
+
+        # FIXME pretty sure that the behavior of the
+        # dereferencing here is inconsistent and incorrect
+        # many systems cannot dereference to their referent
+
+        # as defined this is mostly used in the context
+        # of dereferncing DNS/url resolution chains
+        # which is useful but mostly an implementation detail
+
+        # having explicit classes for substreams may help here
+        # by making it possible to dereference the identifier,
+        # the metadata stream, the data stream, etc. independenly
         raise NotImplementedError
 
     def headers(self):
@@ -301,6 +331,10 @@ class StreamUri(Stream):
     def identifier(self):
         return self._identifier
 
+    @property
+    def identifier_actionable(self):
+        return self.asUri()
+
     @property  # FIXME pretty sure this shouldn't be properties due to the accept_mimetypes ...
     def id_bound_metadata(self):
         # FIXME this can be id_bound_metadata_free or id_bound_metadata_bound
@@ -320,7 +354,7 @@ class StreamUri(Stream):
         # FIXME this is really dereference chain super
         return tuple(StringProgenitor(resp.url, progenitor=resp)
                      for resp in
-                     resolution_chain_responses(self.identifier,
+                     resolution_chain_responses(self.identifier_actionable,
                                                 raise_on_final=False))
 
     @cache_result
@@ -368,3 +402,11 @@ class StreamUri(Stream):
         # if somewhat confusing
         self._resp_data = requests.get(self.identifier)  # FIXME TODO
         return self._resp_data.content
+
+    def asUri(self, asType=None):
+        # FIXME this should probably be abstracted to asActionable
+        # where actionability is defined by some resolver class
+        # defaulting to the system specified default resolver
+        # e.g. for doi, orcid, ror, etc. at the moment that is
+        # the DNS system for resolving urls
+        raise NotImplementedError('implement in subclass')

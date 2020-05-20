@@ -67,8 +67,10 @@ class OrcidId(oq.OntId, idlib.Identifier):
 
 
 class Orcid(idlib.HelperNoData, idlib.Stream):
+
     _id_class = OrcidId
 
+    identifier_actionable = streams.StreamUri.identifier_actionable
     dereference_chain = streams.StreamUri.dereference_chain
     dereference = streams.StreamUri.dereference
     #progenitor = streams.StreamUri.progenitor

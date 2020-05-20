@@ -2,6 +2,7 @@ import re
 import requests  # resolver dejoure
 import idlib
 from idlib import formats
+from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache, COOLDOWN
@@ -11,7 +12,11 @@ from idlib.config import auth
 
 class RridId(idlib.Identifier):
 
-    canonical_regex = 'RRID:([A-Z]+)_([A-Za-z0-9_:-]+)'
+    canonical_regex = 'RRID:([A-Za-z]+)_([A-Za-z0-9_:-]+)'
+    # NOTE: the canonical regex fails to capture a couple
+    # of legacy cases e.g. RRID:WB-STRAIN_ and RRID:MGI:
+    # yes I understand why MGI doesn't want RRID:MGI_MGI:
+    # but what other identifier namespaces do they use?
     _variant_regex = 'RRID:([A-Z]+):([A-Za-z0-9_:-]+)'  # legacy
     _local_conventions = conv.Identity
 
@@ -30,8 +35,13 @@ class RridId(idlib.Identifier):
         authority, authority_local_identifier = match.groups()
         return authority, authority_local_identifier
 
+    def _checksum(self, cypher):
+        m = cypher()
+        m.update(self.identifier.encode())
+        return m.digest()
 
-class Rrid(formats.Rdf, idlib.Stream):
+
+class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
 
     _id_class = RridId
 
@@ -39,14 +49,28 @@ class Rrid(formats.Rdf, idlib.Stream):
 
     _COOLDOWN = False
 
+    identifier_actionable = streams.StreamUri.identifier_actionable
+    dereference_chain = streams.StreamUri.dereference_chain
+    dereference = streams.StreamUri.dereference
+    headers = streams.StreamUri.headers
+
     @property
     def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
         metadata = self.metadata()
         # wouldn't it be nice if all the metadata schemas had a common field called 'identifier' ?
-        id = metadata['item']['curie']
+        id = metadata['rrid']['curie']
         return self._id_class(id)
 
     identifier_bound_metadata = id_bound_metadata
+
+    @property
+    def id_bound_ver_metadata(self):
+        # RRID records do not have a version at the moment
+        # there is a UUID of ambiguous provenace and usefulness
+        # but not formal version of the record
+        return None
+
+    identifier_bound_version_metadata = id_bound_ver_metadata
 
     @cache_result
     def metadata(self):
@@ -77,6 +101,22 @@ class Rrid(formats.Rdf, idlib.Stream):
                 self._resp_metadata.raise_for_status()
             except BaseException as e:
                 raise exc.ResolutionError(identifier) from e
+
+    @cache_result
+    def _checksum(self, cypher):
+        # FIXME unqualified checksum goes to ... metadata ???
+        # TODO figure out what actuall constitues
+        # the identity of the RRID record ...
+        m = cypher()
+        metadata = self.metadata()
+        proper_citation = metadata['rrid']['properCitation']
+        m.update(self.identifier.checksum(cypher))
+        m.update(self.id_bound_metadata.checksum(cypher))
+        m.update(proper_citation.encode())
+        for vuri in self.vendorUris:
+            m.update(vuri.encode())
+
+        return m.digest()
 
     @property
     def vendorUris(self):
