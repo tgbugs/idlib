@@ -228,6 +228,11 @@ class Pio(idlib.Stream):
         for u in self.data['authors']:
             yield PioUserInst(prefix='pio.user', suffix=u['username'])
 
+    def asUri(self, asType=None):
+        return (self.identifier.iri
+                if asType is None else
+                asType(self.identifier.iri))
+
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns

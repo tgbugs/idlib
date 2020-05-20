@@ -283,5 +283,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
     def asHandle(self):
         return idlib.Handle(self.suffix)
 
-    def asUri(self):
-        return self.identifier.iri
+    def asUri(self, asType=None):
+        return (self.identifier.iri
+                if asType is None else
+                asType(self.identifier.iri))

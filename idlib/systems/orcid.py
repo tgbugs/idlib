@@ -152,3 +152,8 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
             out.append(on['content'])
 
         return out
+
+    def asUri(self, asType=None):
+        return (self.identifier.iri
+                if asType is None else
+                asType(self.identifier.iri))

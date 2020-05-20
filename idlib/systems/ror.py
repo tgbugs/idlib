@@ -215,5 +215,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
 
     # alternate representations
 
-    def asUri(self):
-        return self.identifier.iri
+    def asUri(self, asType=None):
+        return (self.identifier.iri
+                if asType is None else
+                asType(self.identifier.iri))

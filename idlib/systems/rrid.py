@@ -112,7 +112,7 @@ class Rrid(formats.Rdf, idlib.Stream):
 
     # alternate representations
 
-    def asUri(self):
+    def asUri(self, asType=None):
         # TODO n2t, identifiers.org
         # TODO TODO having an explicit model for resolver/metadata services
         # seems like it would subsume the SciGraph/ontquery services
@@ -120,4 +120,5 @@ class Rrid(formats.Rdf, idlib.Stream):
         # proper separation between the implementation details of
         # the identifier classes and their various resolver services
         # this would allow us to sandbox the resolver de jour problem
-        return self._resolver_template.format(id=self.identifier)
+        uri_string = self._resolver_template.format(id=self.identifier)
+        return uri_string if asType is None else asType(uri_string)
