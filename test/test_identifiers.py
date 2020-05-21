@@ -58,7 +58,10 @@ class HelperStream:
     def test_asDict(self):
         for id in self.ids:
             s = self.stream(id)
-            d = s.asDict()
+            try:
+                d = s.asDict()
+            except requests.exceptions.ConnectionError as e:
+                pytest.skip('Internet done goofed')
 
 
 @pytest.mark.skip('Not ready.')
