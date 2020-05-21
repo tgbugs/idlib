@@ -1,9 +1,14 @@
+import requests
+import orthauth as oa
 import ontquery as oq  # temporary implementation detail
 import idlib
+from idlib import apis
 from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
-from idlib.utils import cache_result
+from idlib.cache import cache, COOLDOWN
+from idlib.utils import log, cache_result
+from idlib.config import auth
 
 
 # from neurondm.simple
@@ -145,6 +150,19 @@ class Pio(idlib.Stream):
     progenitor = streams.StreamUri.progenitor
     headers = streams.StreamUri.headers
 
+    @classmethod
+    def setup(cls, creds_file=None):
+        if creds_file is None:
+            try:
+                creds_file = auth.get_path('protocols-io-api-creds-file')
+            except KeyError as e:
+                raise TypeError('creds_file is a required argument'
+                                ' unless you have it in secrets') from e
+
+        _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
+        cls._pio_header = oa.utils.QuietDict(
+            {'Authorization': 'Bearer ' + _pio_creds.token})
+
     def __gt__(self, other):
         if isinstance(other, idlib.Stream):
             return self.identifier > other.identifier
@@ -179,7 +197,7 @@ class Pio(idlib.Stream):
 
     def data(self):
         if not hasattr(self, '_data'):
-            blob = self._protocol_data.protocol(self.identifier)
+            blob = self._get_data(self.identifier)
             if blob is not None:
                 self._status_code = blob['status_code']
                 self._data = blob['protocol']
@@ -187,6 +205,37 @@ class Pio(idlib.Stream):
                 self._data = None  # FIXME raise
 
         return self._data
+
+    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
+    def _get_data(self, identifier):
+        """ slug is used as the cache key we will get duplicates for
+            private uris, but that is ok """
+
+        # TODO progenitors
+
+        apiuri = identifier.uri_api
+        log.debug('going to network for protocols')
+        resp = requests.get(apiuri, headers=self._pio_header)
+        #log.info(str(resp.request.headers))
+        if resp.ok:
+            try:
+                j = resp.json()  # the api is reasonably consistent
+                return j
+            except Exception as e:
+                log.exception(e)
+                raise e
+        else:
+            try:
+                j = resp.json()
+                sc = j['status_code']
+                em = j['error_message']
+                msg = (f'protocol issue {uri} {resp.status_code} '
+                       f'{sc} {em} {self.id!r}')
+                self._failure_message = msg  # FIXME HACK use progenitor instead
+                return {COOLDOWN: msg,}
+                # can't return here because of the cache
+            except Exception as e:
+                log.exception(e)
 
     metadata = data  # FIXME
 
@@ -234,6 +283,7 @@ class Pio(idlib.Stream):
                 if asType is None else
                 asType(self.identifier.iri))
 
+Pio.setup()  # FIXME
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
