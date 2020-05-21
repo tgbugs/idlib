@@ -1,25 +1,35 @@
 import os
+import pickle
 import hashlib
 import unittest
 import pytest
+from joblib import Parallel, delayed
 import idlib
 
 skipif_ci = pytest.mark.skipif('CI' in os.environ, reason='API key required')
 
 
+def lol(d):
+    """ HEY KIDS WATCH THIS """
+    Parallel(n_jobs=2)(delayed(lambda d: d)(d) for d in (d,))
+
+
 class HelperStream:
     stream = None
     ids = tuple()
+
     def test_stream_sections(self):
         # TODO run each on of the properties/methods in
         # a separate loop?
+        cypher = hashlib.blake2b
+        bads = []
         for i in self.ids:
             d = self.stream(i)
             d.identifier
             d.identifier_bound_metadata
             d.identifier_bound_version_metadata
-            d.checksum(hashlib.blake2b)  # data or metadata? indication that there should be multiple probably
-            d.dereference()
+            d.checksum(cypher)  # data or metadata? indication that there should be multiple probably
+            d.dereference()  # XXX induces infinite recursion
             d.headers()
             d.metadata()
 
@@ -27,6 +37,17 @@ class HelperStream:
                 d.data()
 
             d.progenitor()  # or is it d.data.progenitor?
+
+            # test pickling
+            hrm = pickle.dumps(d)
+            tv = pickle.loads(hrm)
+            if tv.checksum(cypher) != d.checksum(cypher):
+                bads.append((tv, d))
+
+            # test joblib
+            lol(d)
+
+        assert not bads, bads
 
     def test_asDict(self):
         for id in self.ids:

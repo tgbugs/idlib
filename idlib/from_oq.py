@@ -107,10 +107,10 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
             normalized = None
 
         self = super().__new__(cls,
-                                curie_or_iri=normalized,
-                                iri=iri,
-                                prefix=prefix,
-                                suffix=suffix)
+                               curie_or_iri=normalized,
+                               iri=iri,
+                               prefix=prefix,
+                               suffix=suffix)
 
         self._unnormalized = curie_or_iri if curie_or_iri else self.iri
         if self.prefix not in self._local_conventions:
@@ -171,6 +171,7 @@ class Pio(idlib.Stream):
     headers = streams.StreamUri.headers
 
     _setup = classmethod(setup)
+
     def __new__(cls, *args, **kwargs):
         # sadly it seems that this has to be defined explicitly
         return object.__new__(cls)
@@ -182,6 +183,13 @@ class Pio(idlib.Stream):
         cls._setup()
         cls.__new__ = cls.__new__rest
         return cls(*args, **kwargs)
+
+    def __getnewargs_ex__(self):
+        # LOL PYTHON
+        # Oh you're approaching __new__ ?!
+        # apparently using this pattern with __new__
+        # breaks the way that loky deserializes things
+        return ((self.identifier,), {})
 
     def __gt__(self, other):
         if isinstance(other, idlib.Stream):
@@ -329,6 +337,9 @@ class Pio(idlib.Stream):
                 asType(self.identifier.iri))
 
 
+Pio._setup()  # SIGH
+
+
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
@@ -381,6 +392,13 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
         cls._setup()
         cls.__new__ = cls.__new__rest
         return cls(*args, **kwargs)
+
+    def __getnewargs_ex__(self):
+        # LOL PYTHON
+        # Oh you're approaching __new__ ?!
+        # apparently using this pattern with __new__
+        # breaks the way that loky deserializes things
+        return ((self.identifier,), {})
 
     @property
     def uri_human(self):

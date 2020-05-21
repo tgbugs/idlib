@@ -45,7 +45,8 @@ class StringProgenitor(str):
         return self._progenitor
 
     def __getnewargs_ex__(self):
-        return (self,), dict(progenitor=self.progenitor)
+        # have to str(self) to avoid infinite recursion
+        return (str(self),), dict(progenitor=self._progenitor)
 
 
 def resolution_chain(iri):
