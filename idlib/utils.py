@@ -29,8 +29,11 @@ class StringProgenitor(str):
             raise TypeError('progenitor is a required keyword argument')
 
         self = super().__new__(cls, value)
-        self.progenitor = progenitor
+        self._progenitor = progenitor
         return self
+
+    def progenitor(self):
+        return self._progenitor
 
     def __getnewargs_ex__(self):
         return (self,), dict(progenitor=self.progenitor)

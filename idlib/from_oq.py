@@ -197,7 +197,12 @@ class Pio(idlib.Stream):
 
     def data(self):
         if not hasattr(self, '_data'):
-            blob = self._get_data(self.identifier)
+            self._progenitors = {}
+            apiuri = self.identifier.uri_api
+            blob, path = self._get_data(apiuri)
+            if 'stream-http' not in self._progenitors:
+                self._progenitors['path'] = path
+
             if blob is not None:
                 self._status_code = blob['status_code']
                 self._data = blob['protocol']
@@ -206,17 +211,16 @@ class Pio(idlib.Stream):
 
         return self._data
 
-    @cache(auth.get_path('cache-path') / 'protocol_json', create=True)
-    def _get_data(self, identifier):
-        """ slug is used as the cache key we will get duplicates for
-            private uris, but that is ok """
+    @cache(auth.get_path('cache-path') / 'protocol_json', create=True, return_path=True)
+    def _get_data(self, apiuri):
+        """ use apiuri as the identifier since it is distinct
+            from other views of the protocol e.g. uri_human etc. """
 
         # TODO progenitors
-
-        apiuri = identifier.uri_api
         log.debug('going to network for protocols')
         resp = requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
+        self._progenitors['stream-http'] = resp
         if resp.ok:
             try:
                 j = resp.json()  # the api is reasonably consistent
@@ -229,8 +233,8 @@ class Pio(idlib.Stream):
                 j = resp.json()
                 sc = j['status_code']
                 em = j['error_message']
-                msg = (f'protocol issue {uri} {resp.status_code} '
-                       f'{sc} {em} {self.id!r}')
+                msg = (f'protocol issue {self.identifier} {resp.status_code} '
+                       f'{sc} {em}')
                 self._failure_message = msg  # FIXME HACK use progenitor instead
                 return {COOLDOWN: msg,}
                 # can't return here because of the cache

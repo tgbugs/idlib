@@ -18,6 +18,7 @@ them.
 # identifies multiple streams collectively, they are most distingiushed by
 # the particular type of substream, (e.g. metadata-free, data-homogenous)
 
+from types import MappingProxyType
 import requests
 import idlib
 from idlib import exceptions as exc
@@ -39,6 +40,8 @@ from idlib.utils import StringProgenitor, log
 class Stream:
 
     _id_class = None
+
+    _progenitors = MappingProxyType({})  # this is a dict, but immutable to prevent accidents
 
     @classmethod
     def fromJson(cls, blob):
@@ -169,19 +172,51 @@ class Stream:
     def _checksum(self, cypher):
         raise NotImplementedError
 
-    @property
-    def progenitor(self):
-        """ the lower level stream from which this one is derived """
-        # could also, confusingly be called a superstream, but
-        # the superstream might have a less differentiated, or simply
-        # a different type or structure (e.g. an IP packet -> a byte stream)
+    def progenitor(self, *args, level=1, type=None, _type=type):
+        """ return the reproductible progenitor object/stream at level n
+            also includes progenitors that are not reproducible but that
+            retain metadata about the substream in question, e.g a requests
+            response object has information about the superstream for a
+            text stream
 
-        # unfortunately the idea of a tributary, or a stream bed
-        # breaks down, though in a pure bytes representation
-        # technically the transport headers do come first
-        raise NotImplementedError
+            generators and filelike objects should not be included in
+            the progenitor list since they do not represent stateless
+            progenitors (i.e. a generator can only be expressed once)
 
-    superstream = progenitor
+            note that sometimes this may include a tuple if the information
+            needed has more than one part, no conventions for this have
+            been decided yet
+
+            level == 0 -> returns self to break"""
+
+        if args:
+            raise TypeError('progenitor acceps keywords arguments only!')
+
+        # FIXME probably makes more sense to store progenitors in a dict
+        # with a controlled set of types than just by accident of ordering
+        # this would allow us to keep everything along the way
+        # of course watch out for garbage collection issues ala lxml etree
+
+        # XXX NOTE: self._progenitors = [] should be set EVERY time data is retrieved
+        # it should NOT be set during __init__
+        # if not hasattr(self, '_progenitors'):  # TODO
+
+        # TODO instrumenting all the other objects with
+        # a progenitor method is going to be a big sigh
+        if type is not None:
+            return self._progenitors[type]  # FIXME need enum or something
+
+        if level is not None and level == 0:
+            return self
+        else:
+            if level < 0:
+                level += 1  # compensate for reversed
+
+            # HACK to retain a stack of progenitors manually for now
+            # FIXME blased insertion order :/ implemnation details
+            return list(self._progenitors.values())[-level]
+
+    # superstream = progenitor  # it would be level=1 but not as useful as we would like
 
     def dereference_chain(self):
         raise NotImplementedError
@@ -374,7 +409,7 @@ class StreamUri(Stream):
             # can't quite do in a complete way, in a minimal way probably
             return uri
 
-    def progenitor(self):
+    def __old_progenitor(self):
         # FIXME there is no single progeneitor here ?
         # or rather, the stream is broken up into objects
         # long before we can do anything about it
@@ -391,7 +426,7 @@ class StreamUri(Stream):
     @cache_result
     def headers(self):
         uri = self.dereference()
-        return uri.progenitor.headers
+        return uri.progenitor().headers
 
     def data(self, mimetype_accept=None):
         # FIXME TODO should the data associated with the doi
@@ -400,8 +435,10 @@ class StreamUri(Stream):
         # required before you can content negotiate on the
         # actual document itself, which is a practical necessity
         # if somewhat confusing
-        self._resp_data = requests.get(self.identifier)  # FIXME TODO
-        return self._resp_data.content
+        self._progenitors = {}
+        resp = requests.get(self.identifier)  # FIXME TODO explicit dereference
+        self._progenitors['stream-http'] = resp
+        return resp.content
 
     def asUri(self, asType=None):
         # FIXME this should probably be abstracted to asActionable

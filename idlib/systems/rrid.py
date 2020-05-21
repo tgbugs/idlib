@@ -78,6 +78,7 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         # oh look an immediate violation of the URI assumption ...
         if metadata is not None:
             self._path_metadata = path
+            self._progenitor_metadata_blob = metadata
             source = metadata['hits']['hits'][0]['_source']
             return source
 
