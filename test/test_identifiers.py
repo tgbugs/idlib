@@ -3,6 +3,7 @@ import pickle
 import hashlib
 import unittest
 import pytest
+import requests
 from joblib import Parallel, delayed
 import idlib
 
@@ -26,23 +27,28 @@ class HelperStream:
         for i in self.ids:
             d = self.stream(i)
             d.identifier
-            d.identifier_bound_metadata
-            d.identifier_bound_version_metadata
-            d.checksum(cypher)  # data or metadata? indication that there should be multiple probably
-            d.dereference()  # XXX induces infinite recursion
-            d.headers()
-            d.metadata()
+            try:
+                d.identifier_bound_metadata
+                d.identifier_bound_version_metadata
 
-            if not isinstance(d, idlib.HelperNoData):
-                d.data()
+                d.checksum(cypher)  # data or metadata? indication that there should be multiple probably
+                d.dereference()  # XXX induces infinite recursion
+                d.headers()
+                d.metadata()
 
-            d.progenitor()  # or is it d.data.progenitor?
+                if not isinstance(d, idlib.HelperNoData):
+                    d.data()
 
-            # test pickling
-            hrm = pickle.dumps(d)
-            tv = pickle.loads(hrm)
-            if tv.checksum(cypher) != d.checksum(cypher):
-                bads.append((tv, d))
+                d.progenitor()  # or is it d.data.progenitor?
+
+                # test pickling
+                hrm = pickle.dumps(d)
+                tv = pickle.loads(hrm)
+                if tv.checksum(cypher) != d.checksum(cypher):
+                    bads.append((tv, d))
+
+            except requests.exceptions.ConnectionError as e:
+                pytest.skip('Internet done goofed')
 
             # test joblib
             lol(d)
