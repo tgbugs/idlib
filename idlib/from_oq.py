@@ -337,9 +337,6 @@ class Pio(idlib.Stream):
                 asType(self.identifier.iri))
 
 
-Pio._setup()  # SIGH
-
-
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
     _dict = {}
