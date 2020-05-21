@@ -1,3 +1,4 @@
+from datetime import datetime
 import requests
 import orthauth as oa
 import ontquery as oq  # temporary implementation detail
@@ -7,7 +8,7 @@ from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache, COOLDOWN
-from idlib.utils import log, cache_result
+from idlib.utils import log, TZLOCAL, cache_result
 from idlib.config import auth
 
 
@@ -86,7 +87,7 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
 })
 
 
-class PioId(oq.OntId, idlib.Identifier):
+class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _namespaces = _PioPrefixes
     _local_conventions = _namespaces
     canonical_regex = '^https://www.protocols.io/(view|edit|private|file-manager|api/v3/protocols)/'
@@ -134,6 +135,25 @@ class PioId(oq.OntId, idlib.Identifier):
     def slug_tail(self):
         return self.slug.rsplit('-', 1)[-1]
 
+    def _checksum(self, cypher):
+        m = cypher()
+        m.update(self.identifier.encode())
+        return m.digest()
+
+
+def setup(cls, creds_file=None):
+    """ because @classmethod only ever works in a single class SIGH """
+    if creds_file is None:
+        try:
+            creds_file = auth.get_path('protocols-io-api-creds-file')
+        except KeyError as e:
+            raise TypeError('creds_file is a required argument'
+                            ' unless you have it in secrets') from e
+
+    _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
+    cls._pio_header = oa.utils.QuietDict(
+        {'Authorization': 'Bearer ' + _pio_creds.token})
+
 
 class Pio(idlib.Stream):
     """ instrumented protocols """
@@ -150,18 +170,18 @@ class Pio(idlib.Stream):
     progenitor = streams.StreamUri.progenitor
     headers = streams.StreamUri.headers
 
-    @classmethod
-    def setup(cls, creds_file=None):
-        if creds_file is None:
-            try:
-                creds_file = auth.get_path('protocols-io-api-creds-file')
-            except KeyError as e:
-                raise TypeError('creds_file is a required argument'
-                                ' unless you have it in secrets') from e
+    _setup = classmethod(setup)
+    def __new__(cls, *args, **kwargs):
+        # sadly it seems that this has to be defined explicitly
+        return object.__new__(cls)
 
-        _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
-        cls._pio_header = oa.utils.QuietDict(
-            {'Authorization': 'Bearer ' + _pio_creds.token})
+    __new__rest = __new__
+
+    def __new__(cls, *args, **kwargs):
+        """ self mutating call once setup style """
+        cls._setup()
+        cls.__new__ = cls.__new__rest
+        return cls(*args, **kwargs)
 
     def __gt__(self, other):
         if isinstance(other, idlib.Stream):
@@ -192,8 +212,17 @@ class Pio(idlib.Stream):
         if data:
             uri = data['uri']
             if uri:
-                nid = self._id_class(prefix='pio.view', suffix=uri)
-                return self.__class__(nid)
+                return self.__class__.fromIdInit(prefix='pio.view', suffix=uri)
+
+    id_bound_metadata = uri_human  # FIXME vs uri field
+    identifier_bound_metadata = id_bound_metadata
+
+    # I think this is the right thing to do in the case where
+    # the identifier is the version identifier and versioning
+    # is tracked opaquely in the data/metadata i.e. that there
+    # is no collection/conceptual identifier
+    id_bound_ver_metadata = id_bound_metadata
+    identifier_bound_version_metadata = id_bound_ver_metadata
 
     def data(self):
         if not hasattr(self, '_data'):
@@ -243,6 +272,18 @@ class Pio(idlib.Stream):
 
     metadata = data  # FIXME
 
+    @cache_result
+    def _checksum(self, cypher):
+        m = cypher()
+        # FIXME TODO hasing of python objects ...
+        metadata = self.metadata()
+        m.update(self.identifier.checksum(cypher))
+        m.update(self.id_bound_metadata.identifier.checksum(cypher))
+        #m.update(self.version_id)  # unix epoch -> ??
+        m.update(self.updated.isoformat().encode())  # in principle more readable
+        #m.update(self.updated.timestamp().hex())
+        return m.digest()
+
     @property
     def hasVersions(self):
         return bool(self.data()['has_versions'])
@@ -275,19 +316,18 @@ class Pio(idlib.Stream):
 
     @property
     def creator(self):
-        return PioUserInst('pio.user:' + self.data()['creator']['username'])
+        return PioUser('pio.user:' + self.data()['creator']['username'])
 
     @property
     def authors(self):
-        for u in self.data['authors']:
-            yield PioUserInst(prefix='pio.user', suffix=u['username'])
+        for u in self.data()['authors']:
+            yield PioUser(PioUserId(prefix='pio.user', suffix=u['username']))
 
     def asUri(self, asType=None):
         return (self.identifier.iri
                 if asType is None else
                 asType(self.identifier.iri))
 
-Pio.setup()  # FIXME
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     # set these manually since, sigh, factory patterns
@@ -302,14 +342,11 @@ _PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
 })
 
 
-class PioUserId(oq.OntId):
+class PioUserId(oq.OntId, idlib.Identifier, idlib.Stream):
     _namespaces = _PioUserPrefixes
     _local_conventions = _namespaces
 
-
-class PioUser(idlib.Stream):
-    _id_class = PioUserId
-    _wants_instance = '.protocols.ProtocolData'  # this is an awful pattern
+    _checksum = PioId._checksum
 
     @property
     def uri_human(self):
@@ -319,19 +356,116 @@ class PioUser(idlib.Stream):
     def uri_api(self):
         return self.__class__(prefix='pio.api.user', suffix=self.suffix)
 
+
+class PioUser(idlib.HelperNoData, idlib.Stream):
+    _id_class = PioUserId
+
+    _get_data = Pio._get_data
+    asUri = Pio.asUri
+    _setup = classmethod(setup)
+
+    identifier_actionable = streams.StreamUri.identifier_actionable
+    dereference_chain = streams.StreamUri.dereference_chain
+    dereference = streams.StreamUri.dereference
+    progenitor = streams.StreamUri.progenitor
+    headers = streams.StreamUri.headers
+
+    def __new__(cls, *args, **kwargs):
+        # sadly it seems that this has to be defined explicitly
+        return object.__new__(cls)
+
+    __new__rest = __new__
+
+    def __new__(cls, *args, **kwargs):
+        """ self mutating call once setup style """
+        cls._setup()
+        cls.__new__ = cls.__new__rest
+        return cls(*args, **kwargs)
+
+    @property
+    def uri_human(self):
+        return self.__class__(self.identifier.uri_human)
+
+    @property
+    def uri_api(self):
+        return self.__class__(self.identifier.uri_api)
+
+    id_bound_metadata = uri_human
+    identifier_bound_metadata = id_bound_metadata
+    id_bound_ver_metadata = id_bound_metadata
+    identifier_bound_version_metadata = id_bound_ver_metadata
+
+    @property
+    def _id_act_metadata(self):
+        """ the actionalble identifier that is directly used to
+            retrieve metadata from the resolver
+
+            TODO there is a better way to implement this which is
+            split the metadata streams into their own classes
+            where the metadata is now treated as data """
+        # FIXME this isn't actuall the id_act
+        # it is really just a convenient way to
+        # skip dealing with the send_* arguments for
+        # metadata and data, namely that the query argument
+        # that we append here should be explicit either
+        # as a default kwarg or something similar
+        # the fact that query parameters can sometimes
+        # be part of the identity of a thing vs used to
+        # modify exactly which parts of a thing are returned
+        # is problematic, but is also something that needs
+        # to be tracked
+        return self.uri_api.asUri() + '?with_extras=1'
+
     @cache_result
     def metadata(self):
-        uri = self.uri_api + '?with_extras=1'
-        # FIXME this is a dumb an convoluted way to get authed api access
-        blob = self._protocol_data.get(uri)
+        self._progenitors = {}
+        blob, path = self._get_data(self._id_act_metadata)
+        if 'stream-http' not in self._progenitors:
+            self._progenitors['path'] = path
+
         self._status_code = blob['status_code']
         return blob['researcher']
+
+    def _metadata_refresh(self):
+        # FIXME nasty code reuse issues here especially
+        # around the fact that _refresh_cache can't be
+        # passed along the scope unless the decorated function
+        # does it manually, which kinda defeats the point
+
+        self._progenitors = {}
+        blob, path = self._get_data(self._id_act_metadata, _refresh_cache=True)
+        return self.metadata()
+
+    @cache_result  # FIXME XXX cache_result currently does not work if there are arguments!
+    def _checksum(self, cypher):
+        m = cypher()
+        metadata = self.metadata()
+        m.update(self.identifier.checksum(cypher))
+        m.update(self.id_bound_metadata.identifier.checksum(cypher))
+        orcid = self.orcid
+        if orcid is not None:
+            # use orcid.identifier.checksum to prevent
+            # changes to the orcid record from causing
+            # changes in the identity of the user record
+            m.update(orcid.identifier.checksum(cypher))
 
     @property
     def orcid(self):
         orcid = self.metadata()['orcid']
         if orcid is not None:
-            return idlib.Orcid(prefix='orcid', suffix=orcid)
+            return idlib.Orcid.fromIdInit(prefix='orcid', suffix=orcid)
+
+    @property
+    def name(self):
+        return self.metadata()['name']
+
+    label = name
+
+    @property
+    def bio(self):
+        return self.metadata()['bio']
+
+    description = bio
 
 
 class IsniId(oq.OntId):  # TODO

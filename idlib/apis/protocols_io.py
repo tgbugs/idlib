@@ -1,16 +1,17 @@
+# FIXME this probably makes more sense as an orthauth module?
 import sys
 import pickle
 from urllib import parse
 from getpass import getpass
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from ..config import auth
 from ..utils import log as _log
+from . import log as _log
 
-log = _log.getChild('protocols_io_api')
+log = _log.getChild('protocols.io')
 
 
-class InstalledAppFlowConsole(InstalledAppFlow):
+class ConsoleHelper:
+
     def run_console_only(self,
                          uri_to_url=True,
                          **kwargs):
@@ -70,6 +71,12 @@ def get_protocols_io_auth(creds_file,
                           store_file=auth.get_path('protocols-io-api-store-file'),
                           SCOPES = 'readwrite'):
 
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+
+    InstalledAppFlowConsole = type('InstalledAppFlowConsole',
+                                   (ConsoleHelper, InstalledAppFlow),
+                                   {})
     if store_file.exists():
         with open(store_file, 'rb') as f:
             try:

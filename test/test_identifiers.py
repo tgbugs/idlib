@@ -1,7 +1,10 @@
+import os
 import hashlib
 import unittest
 import pytest
 import idlib
+
+skipif_ci = pytest.mark.skipif('CI' in os.environ, reason='API key required')
 
 
 class HelperStream:
@@ -130,4 +133,28 @@ class TestRrid(HelperStream, unittest.TestCase):
         'RRID:RGD_10395233',
         'RRID:Addgene_19640',
         #'RRID:NCBITaxon_9606',  # TODO not in resolver yet
+    ]
+
+
+@skipif_ci
+class TestPio(HelperStream, unittest.TestCase):
+    stream = idlib.Pio
+    ids = [
+        'https://www.protocols.io/view/reuse-pc3diyn',
+        'https://www.protocols.io/private/8DAE4D2451D5FE18A421D102BC2BEB39',
+    ]
+
+    def test_users(self):
+        for i in self.ids:
+            d = self.stream(i)
+            print(d.creator.orcid)
+            for a in d.authors:
+                print(a.orcid)
+
+
+@skipif_ci
+class TestPioUser(HelperStream, unittest.TestCase):
+    stream = idlib.PioUser
+    ids = [
+        'pio.user:tom-gillespie',
     ]

@@ -75,7 +75,6 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     #data = idlib.NoDataDereference.data
     #id_bound_data = idlib.NoDataDereference.id_bound_data  # FIXME reuse the Meta and Data from OntRes
 
-
     @property
     def checksumValid(self):
         return self._id_class(self.identifier).checksumValid

@@ -115,7 +115,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
         URL = metadata['URL']
         DOI = metadata['DOI']
         #prefix = metadata['prefix']  # NOTE NOT the curie meaning of prefix
-        return self._id_class(DOI)
+        return self._id_class(DOI)  # FIXME pretty sure this should just be self.__class__ ?
 
     identifier_bound_metadata = id_bound_metadata
 

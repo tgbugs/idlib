@@ -16,7 +16,8 @@ with open('README.md', 'rt') as f:
     long_description = f.read()
 
 rdf_require = ['rdflib>=5.0.0rc1', 'pyontutils>=0.1.13']
-tests_require = ['pytest', 'pytest-runner'] + rdf_require
+oauth_require = ['google-auth-oauthlib']
+tests_require = ['pytest', 'pytest-runner'] + rdf_require + oauth_require
 setup(name='idlib',
       version=__version__,
       description='A library for working with identifiers of all kinds.',
@@ -36,6 +37,7 @@ setup(name='idlib',
       keywords=('python persistent identifiers'),
       packages=[
           'idlib',
+          'idlib.apis',
           'idlib.conventions',
           'idlib.formats',
           'idlib.systems',
@@ -45,6 +47,7 @@ setup(name='idlib',
       install_requires=['orthauth>=0.0.11', 'requests'],
       extras_require={'test': tests_require,
                       'rdf': rdf_require,
+                      'oauth': oauth_require,
                      },
       scripts=[],
       entry_points={'console_scripts': [ ],},

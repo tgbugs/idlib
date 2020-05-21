@@ -1,8 +1,11 @@
 import logging
+from datetime import datetime, timezone
 from functools import wraps
 import requests
 from idlib import exceptions as exc
 
+
+## logging
 
 def makeSimpleLogger(name, level=logging.INFO):
     # TODO use extra ...
@@ -21,6 +24,12 @@ def makeSimpleLogger(name, level=logging.INFO):
 
 log = makeSimpleLogger('idlib')
 logd = log.getChild('data')
+
+
+## time (from pyontutils.utils)
+
+def TZLOCAL():
+    return datetime.now(timezone.utc).astimezone().tzinfo
 
 
 class StringProgenitor(str):

@@ -57,7 +57,10 @@ def argspector(function):
 
 
 def cache(folder, ser='json', clear_cache=False, create=False, return_path=False):
-    """ outer decorator to cache output of a function to a folder """
+    """ outer decorator to cache output of a function to a folder
+
+        decorated functions accept an additional keyword argument
+        `_refresh_cache` that can be used to force refresh the cache """
 
     if ser == 'json':
         serialize = json.dump
@@ -85,11 +88,11 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
         spector = argspector(function)
         fn = function.__name__
         @wraps(function)
-        def superinner(*args, **kwargs):
+        def superinner(*args, _refresh_cache=False, **kwargs):
             filename = cache_hash(spector(*args, ____fn=fn, **kwargs))
             filepath = folder / filename
             fe = filepath.exists()
-            if fe:
+            if fe and not _refresh_cache:
                 log.debug(f'deserializing from {filepath}')
                 with open(filepath, read_mode) as f:
                     output = deserialize(f)

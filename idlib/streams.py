@@ -52,6 +52,10 @@ class Stream:
         else:
             return cls(identifier)
 
+    @classmethod
+    def fromIdInit(cls, *args, **kwargs):
+        return cls(cls._id_class(*args, **kwargs))
+
     def __init__(self, identifier_or_id_as_string=None, *args, **kwargs):
         # FIXME or identifier, string, or another stream
         if isinstance(self, idlib.Identifier):
