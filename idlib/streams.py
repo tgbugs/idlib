@@ -152,6 +152,27 @@ class Stream:
     def identifier(self, value):
         raise NotImplementedError('You probably meant to set self._identifier?')  # probably should never allow this ...
 
+    def asStr(self):
+        """ Return the idlib string representation of the identifier """
+        # FIXME we probably need a safe version of this that
+        # errors if the identifier/stream is a local identifier
+        if hasattr(self, '_id_class') and self._id_class is str:
+            return self.identifier
+        #elif not hasattr(self, '_id_class'):  # will probably need this
+        else:
+            return self.identifier.asStr()
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.identifier == other.identifier
+
+    def __hash__(self):
+        """ The hash here identifies the NAME of the stream
+            NOT the STATE of the stream. Two streams have the
+            same hash if they have the same identifier. If you
+            want to know if there are two equal streams that
+            are different objects use self `is' other instead. """
+        return hash((self.__class__, self.asStr()))
+
     @property
     def identifier_actionable(self):
         """ The 'resolvable' or actionable form of an identifier

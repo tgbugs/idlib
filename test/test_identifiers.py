@@ -55,6 +55,45 @@ class HelperStream:
 
         assert not bads, bads
 
+    def test_hash_eq_id(self):
+        hrm = self.ids[0]
+        i1 = self.stream(hrm)
+        i2 = self.stream(hrm)
+
+        # what did we decide about how to handle this?
+        # stream is the same but the state might be different?
+        # what are the design tradeoffs here? it means that the
+        # stream cannot be used as a dictionary key, which is
+        # extremely annoying, but would still have A is B => False
+
+        # we decided (as of now) that all streams hash to their
+        # class plus the string representation of their identifier
+        # and that equality compares class and identifier equality
+
+        # hash testing
+        assert len({i1, i2}) == 1
+        assert len({i1.identifier, i2.identifier}) == 1
+
+        assert len({i1, i1.identifier}) == 2
+        assert len({i1, i2.identifier}) == 2
+        assert len({i1.identifier, i2}) == 2
+
+        # equality testing
+        assert i1 == i2
+        assert i1.identifier == i2.identifier
+
+        assert i1 != i1.identifier
+        assert i1 != i2.identifier
+        assert i1.identifier != i2
+
+        # python object identity testing (confusingly)
+        assert i1 is not i2
+        assert i1.identifier is not i2.identifier
+
+        assert i1 is not i1.identifier
+        assert i1 is not i2.identifier
+        assert i1.identifier is not i2
+
     def test_asDict(self):
         for id in self.ids:
             s = self.stream(id)
