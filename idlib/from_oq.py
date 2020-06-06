@@ -214,6 +214,7 @@ class Pio(idlib.Stream):
                 return idlib.Doi(doi)
 
     @property
+    @cache_result  # caching this cuts time in half for 2 calls etc. 5s / 10s over 25k calls
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
         data = self.data()
