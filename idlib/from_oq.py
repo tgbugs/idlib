@@ -329,8 +329,26 @@ class Pio(idlib.Stream):
 
     @property
     def authors(self):
+        class Author:
+            def __init__(self, blob):
+                self.blob = blob
+                self.name = blob['name']
+
         for u in self.data()['authors']:
-            yield PioUser(PioUserId(prefix='pio.user', suffix=u['username']))
+            yield Author(u)
+            continue
+            # FIXME TODO
+            _username = u['username']
+            username = (_username
+                        if _username is not None else
+                        (u['name'].replace(' ', '-') + 'FAKE'))
+            uid = PioUserId(prefix='pio.user', suffix=username)
+            pu = PioUser(uid)
+            if _username is None:
+                def metadata(self, __asdf=u):
+                    return __asdf
+
+            yield pu
 
     def asUri(self, asType=None):
         return (self.identifier.iri
@@ -439,8 +457,11 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
         if 'stream-http' not in self._progenitors:
             self._progenitors['path'] = path
 
-        self._status_code = blob['status_code']
-        return blob['researcher']
+        if blob is not None:
+            self._status_code = blob['status_code']
+            return blob['researcher']
+        else:
+            return {'name': ''}
 
     def _metadata_refresh(self):
         # FIXME nasty code reuse issues here especially
