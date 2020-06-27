@@ -1,4 +1,3 @@
-import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
 import idlib
 from idlib import formats
@@ -154,7 +153,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
             'application/vnd.datacite.datacite+json, '  # first so it can fail
             'application/json, '  # undocumented fallthrough for crossref ?
         )
-        resp = requests.get(identifier, headers={'Accept': accept})
+        resp = self._requests.get(identifier, headers={'Accept': accept})
         self._resp_metadata = resp  # FIXME for progenitor
         if resp.ok:
             return resp.json()
@@ -178,7 +177,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
 
     def ttl(self):  # this is another potential way to deal with mimetypes
         # both datacite and crossref produce in turtle
-        resp = requests.get(self.identifier, headers={'Accept': 'text/turtle'})
+        resp = self._requests.get(self.identifier, headers={'Accept': 'text/turtle'})
         self._ttl_resp = resp
         ct = resp.headers['Content-Type']
         if 'text/html' in ct:
@@ -200,8 +199,8 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
             # TODO failover to the git repo api?
             mailto = 'tgbugs+idlib-no-git@gmail.com'
 
-        resp_obj = requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
-        resp_sub = requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')
+        resp_obj = self._requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
+        resp_sub = self._requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')
         # TODO if > 1000 get the rest using the pagination token
         yield from resp_sub.json()['message']['events']
         yield from resp_obj.json()['message']['events']

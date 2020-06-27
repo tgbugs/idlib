@@ -1,5 +1,5 @@
 from datetime import datetime
-import requests
+#import requests
 import orthauth as oa
 import ontquery as oq  # temporary implementation detail
 import idlib
@@ -29,13 +29,13 @@ class OntTerm(oq.OntTerm):
         return self
 
 
-class URIInstrumentation(oq.terms.InstrumentedIdentifier):
+class URIInstrumentation(oq.terms.InstrumentedIdentifier):  # XXX unused
 
     @property
     def headers(self):
         """ request headers """
         if not hasattr(self, '_headers'):
-            resp = requests.head(self.iri)  # TODO status handling for all these
+            resp = self._requests.head(self.iri)  # TODO status handling for all these
             self._headers = resp.headers
 
         return self._headers

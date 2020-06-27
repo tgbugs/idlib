@@ -19,11 +19,9 @@ them.
 # the particular type of substream, (e.g. metadata-free, data-homogenous)
 
 from types import MappingProxyType
-import requests
 import idlib
 from idlib import exceptions as exc
-from idlib.utils import cache_result, resolution_chain_responses
-from idlib.utils import StringProgenitor, log
+from idlib.utils import cache_result, StringProgenitor, log
 
 
 # TODO it seems like there is a little dance going on between identifiers and local names
@@ -42,6 +40,24 @@ class Stream:
     _id_class = None
 
     _progenitors = MappingProxyType({})  # this is a dict, but immutable to prevent accidents
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
+
+    _renew = __new__
+
+    def __new__(cls, *args, **kwargs):
+        Stream._setup(*args, **kwargs)
+        Stream.__new__ = Stream._renew
+        return super().__new__(cls)
+
+    @staticmethod
+    def _setup(*args, **kwargs):
+        import requests  # resolver dejoure
+        Stream._requests = requests
+
+        from idlib.core import resolution_chain_responses
+        Stream._resolution_chain_responses = staticmethod(resolution_chain_responses)
 
     @classmethod
     def fromJson(cls, blob):
@@ -387,6 +403,7 @@ class StreamUri(Stream):
 
     _id_class = None  # NOTE asssigned to idlib.Uri in idlib.__init__
 
+
     @property
     def identifier(self):
         return self._identifier
@@ -414,7 +431,7 @@ class StreamUri(Stream):
         # FIXME this is really dereference chain super
         return tuple(StringProgenitor(resp.url, progenitor=resp)
                      for resp in
-                     resolution_chain_responses(self.identifier_actionable,
+                     self._resolution_chain_responses(self.identifier_actionable,
                                                 raise_on_final=False))
 
     @cache_result
@@ -461,7 +478,7 @@ class StreamUri(Stream):
         # actual document itself, which is a practical necessity
         # if somewhat confusing
         self._progenitors = {}
-        resp = requests.get(self.identifier)  # FIXME TODO explicit dereference
+        resp = self._requests.get(self.identifier)  # FIXME TODO explicit dereference
         self._progenitors['stream-http'] = resp
         return resp.content
 

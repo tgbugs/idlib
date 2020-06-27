@@ -1,5 +1,4 @@
 import re
-import requests  # resolver dejoure
 import idlib
 from idlib import formats
 from idlib import streams
@@ -90,8 +89,8 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     @cache(auth.get_path('cache-path') / 'rrid_json', create=True, return_path=True)
     def _metadata(self, identifier):
         idq = self._resolver_template.format(id=identifier)
-        #self._resp_metadata = requests.get(idq, headers={'Accept': 'application/json'})  # issue submitted
-        self._resp_metadata = requests.get(idq + '.json')
+        #self._resp_metadata = self._requests.get(idq, headers={'Accept': 'application/json'})  # issue submitted
+        self._resp_metadata = self._requests.get(idq + '.json')
         if self._resp_metadata.ok:
             return self._resp_metadata.json()
         elif self._COOLDOWN and self._resp_metadata.status_code == 404:

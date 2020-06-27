@@ -1,5 +1,4 @@
 from pathlib import Path
-import requests
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
@@ -91,7 +90,7 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
         prefix = 'orcid.pub.3'  # NOTE THE CHANGE IN PREFIX
         idq = self._id_class(prefix=prefix, suffix=suffix)
         headers = {'Accept': 'application/orcid+json'}
-        self._resp_metadata = requests.get(idq, headers=headers)
+        self._resp_metadata = self._requests.get(idq, headers=headers)
         if self._resp_metadata.ok:
             return self._resp_metadata.json()
 

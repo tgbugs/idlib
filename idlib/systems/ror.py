@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-import requests  # resolver dejoure
 import ontquery as oq  # temp implementation detail
 import idlib
 from idlib import formats
@@ -118,7 +117,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         # vs data endpoint pattern ...
         prefix = 'ror.api'  # NOTE THE CHANGE IN PREFIX
         idq = self._id_class(prefix=prefix, suffix=suffix)
-        self._resp_metadata = requests.get(idq)
+        self._resp_metadata = self._requests.get(idq)
         if self._resp_metadata.ok:
             return self._resp_metadata.json()
         else:

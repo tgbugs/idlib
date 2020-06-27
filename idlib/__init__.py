@@ -1,4 +1,4 @@
-from idlib.core import families
+from idlib.utils import families
 from idlib.streams import (Stream,
                            HelperNoData,
                            StreamUri,)
