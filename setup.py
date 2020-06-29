@@ -17,7 +17,7 @@ with open('README.md', 'rt') as f:
 
 rdf_require = ['rdflib>=5.0.0rc1', 'pyontutils>=0.1.13']
 oauth_require = ['google-auth-oauthlib']
-tests_require = (['pytest', 'pytest-runner', 'joblib>=0.14.1'] +
+tests_require = (['pytest', 'joblib>=0.14.1'] +
                  rdf_require +
                  oauth_require)
 setup(name='idlib',
