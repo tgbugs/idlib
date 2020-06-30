@@ -256,7 +256,7 @@ class Pio(idlib.Stream):
 
         # TODO progenitors
         log.debug('going to network for protocols')
-        resp = requests.get(apiuri, headers=self._pio_header)
+        resp = self._requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
         self._progenitors['stream-http'] = resp
         if resp.ok:

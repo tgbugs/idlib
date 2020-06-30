@@ -56,7 +56,7 @@ class OrcidId(oq.OntId, idlib.Identifier):
             remainder = total % 11
             result = (12 - remainder) % 11
             return result == check
-        except ValueError as e:
+        except (AttributeError, ValueError) as e:
             raise self.OrcidChecksumError(self) from e
 
     def _checksum(self, cypher):
