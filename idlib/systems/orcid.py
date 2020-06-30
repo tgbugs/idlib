@@ -40,6 +40,32 @@ class OrcidId(oq.OntId, idlib.Identifier):
     class OrcidChecksumError(OrcidMalformedError):
         """ failed checksum """
 
+    def __new__(cls, *args, **kwargs):
+        """ because __new__ returns the instance we can't split
+            and call both paths through __new__ in the MRO, one
+            of them always has to be the first and only superclass
+            this is non-obvious and annoying """
+        self = super().__new__(cls, *args, **kwargs)
+        if self.prefix is None or self.suffix is None:
+            # XXX NOTE DO NOT, I REPEAT DO NOT try to specify
+            # the parser/regex for acceptable identifier forms
+            # here, using normalize, or fromUnsafe, or anything else
+            # and pass it directly to construction without returning
+            # it first, that makes it impossible to hook into the process
+            # and return the suggested normalization, and/or we have to
+            # make it possible to mark orcid ids as coming from a dirty
+            # source which is also bad ... I don't know how to solve this
+            # in a sane way, so for now I'm pushing it back to the datasources
+            # to fix the malformed input data, this is probably something
+            # that idlib could handle, but I need a clearer understanding of
+            # the issue before moving forward with implementing normalization
+            # NOTE: yes, doi normalization has already been implemented, but
+            # that means source data is never corrected if it doesn't match the
+            # canonical regex, etc. same issue here with strict parsing vs loose.
+            raise cls.OrcidMalformedError(self)
+
+        return self
+
     @property
     def checksumValid(self):
         """ see
@@ -56,7 +82,7 @@ class OrcidId(oq.OntId, idlib.Identifier):
             remainder = total % 11
             result = (12 - remainder) % 11
             return result == check
-        except (AttributeError, ValueError) as e:
+        except ValueError as e:
             raise self.OrcidChecksumError(self) from e
 
     def _checksum(self, cypher):

@@ -34,6 +34,12 @@ class RorId(oq.OntId, idlib.Identifier):
     _base = len(_index)
     canonical_regex = '^https://ror.org/0[0-9a-z]{6}[0-9]{2}$'
 
+    def __new__(cls, *args, **kwargs):
+        self = super().__new__(cls, *args, **kwargs)
+        if self.prefix is None or self.suffix is None:
+            raise cls.OrcidMalformedError(self)
+        return self
+
     @property
     def checksumValid(self):
         """ <https://github.com/ror-community/ror-api/blob/4f91dcb1c4cdeb1c44c92c8c82dc984081585293/

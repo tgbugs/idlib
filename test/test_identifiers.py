@@ -18,6 +18,7 @@ def lol(d):
 class HelperStream:
     stream = None
     ids = tuple()
+    ids_bad = tuple()
 
     def test_stream_sections(self):
         # TODO run each on of the properties/methods in
@@ -27,6 +28,13 @@ class HelperStream:
         for i in self.ids:
             d = self.stream(i)
             d.identifier
+            if d.identifier and hasattr(d.identifier, 'prefix'):
+                print(d.identifier)
+                print(d.identifier.prefix)
+                print(d.identifier.suffix)
+                if d.identifier.prefix is None or d.identifier.suffix is None:
+                    bads.append(d.identifier.__dict__)
+
             try:
                 d.identifier_bound_metadata
                 d.identifier_bound_version_metadata
@@ -52,6 +60,17 @@ class HelperStream:
 
             # test joblib
             lol(d)
+
+        assert not bads, bads
+
+    def test_malformed(self):
+        bads = []
+        for i in self.ids_bad:
+            try:
+                d = self.stream(i)
+                d.append(bads)
+            except:
+                pass
 
         assert not bads, bads
 
@@ -109,6 +128,7 @@ class TestStreamUri(HelperStream, unittest.TestCase):
     ids = [
         'https://github.com',
     ]
+    ids_bad = ['lol not an identifier']
     def test_wat(self):
         ic = self.stream._id_class
         i = ic(self.ids[0])
@@ -120,6 +140,7 @@ class TestArk(HelperStream, unittest.TestCase):
     ids = [
         'https://doi.org/10.13003/5jchdy',
     ]
+    ids_bad = ['lol not an identifier']
 
 
 class TestDoi(HelperStream, unittest.TestCase):
@@ -127,6 +148,7 @@ class TestDoi(HelperStream, unittest.TestCase):
     ids = [
         'https://doi.org/10.13003/5jchdy',
     ]
+    ids_bad = ['lol not an identifier']
     def test_version_f1000(self):
         # this doesn't exist
         #d = idlib.Doi('https://doi.org/10.12688/f1000research.6555')
@@ -148,6 +170,11 @@ class TestOrcid(HelperStream, unittest.TestCase):
         'https://orcid.org/0000-0001-5109-3700',
         'https://orcid.org/0000-0002-1694-233X',
     ]
+    ids_bad = []
+    for __i in ids:  # LOL PYTHON class scope list comprehensions
+        ids_bad.append(__i.replace('https', 'http'))
+    del __i
+
     def test_validate(self):
         ids = [self.stream._id_class(orcid) for orcid in self.ids]
         bads = [orcid for orcid in ids if not orcid.checksumValid]
@@ -169,6 +196,10 @@ class TestRor(HelperStream, unittest.TestCase):
         'https://ror.org/02dqehb95',
         'https://ror.org/051fd9666',
     ]
+    ids_bad = []
+    for __i in ids:  # LOL PYTHON class scope list comprehensions
+        ids_bad.append(__i.replace('https', 'http'))
+    del __i
 
     def test_init(self):
         ic = idlib.Ror._id_class
@@ -203,6 +234,7 @@ class TestRrid(HelperStream, unittest.TestCase):
         'RRID:Addgene_19640',
         #'RRID:NCBITaxon_9606',  # TODO not in resolver yet
     ]
+    ids_bad = ['lol not an identifier']
 
 
 @skipif_ci
@@ -212,6 +244,7 @@ class TestPio(HelperStream, unittest.TestCase):
         'https://www.protocols.io/view/reuse-pc3diyn',
         'https://www.protocols.io/private/8DAE4D2451D5FE18A421D102BC2BEB39',
     ]
+    ids_bad = ['lol not an identifier']
 
     def test_users(self):
         for i in self.ids:

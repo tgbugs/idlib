@@ -53,13 +53,14 @@ class Identifier(idlib.Stream):  # TODO decide if str should be base ...
     # same with local:?:1, local:?:2, local:?:3, local:?:4
 
     _id_class = str
+    canonical_regex = None  # but really '.+'
     #@staticmethod
     #def normalize(identifier):
         #raise NotImplementedError
         #return identifier
 
     def __new__(cls, *args, **kwargs):
-        return super().__new__(cls)
+        return super().__new__(cls, *args, **kwargs)
 
     def __init__(self, *args, **kwargs):
         return super().__init__(*args, **kwargs)
