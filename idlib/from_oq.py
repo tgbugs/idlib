@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 #import requests
 import orthauth as oa
@@ -140,6 +141,9 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
         m.update(self.identifier.encode())
         return m.digest()
 
+    def is_private(self):
+        return self.prefix == 'pio.private'
+
 
 def setup(cls, creds_file=None):
     """ because @classmethod only ever works in a single class SIGH """
@@ -174,7 +178,7 @@ class Pio(idlib.Stream):
 
     def __new__(cls, *args, **kwargs):
         # sadly it seems that this has to be defined explicitly
-        return object.__new__(cls)
+        return super().__new__(cls)
 
     __new__rest = __new__
 
@@ -241,11 +245,27 @@ class Pio(idlib.Stream):
             if 'stream-http' not in self._progenitors:
                 self._progenitors['path'] = path
 
-            if blob is not None:
+            if blob is None:
+                with open(path, 'rt') as f:
+                    blob = json.load(f)
+
+                message = blob[COOLDOWN]
+                if 'pio_status_code' not in blob:
+                    log.critical(blob)
+                    path.unlink()
+                    raise NotImplementedError('asdf')
+
+                sc = blob['pio_status_code']
+                if sc == 212:  # Protocol does not exist
+                    raise exc.IdDoesNotExistError(message)
+                elif sc in (250, 205):  # access requested, not authorized
+                    raise exc.NotAuthorizedError(message)
+                else:
+                    msg = f'unhandled pio status code {sc}\n' + message
+                    raise NotImplementedError(msg)
+            else:
                 self._status_code = blob['status_code']
                 self._data = blob['protocol']
-            else:
-                self._data = None  # FIXME raise
 
         return self._data
 
@@ -274,7 +294,10 @@ class Pio(idlib.Stream):
                 msg = (f'protocol issue {self.identifier} {resp.status_code} '
                        f'{sc} {em}')
                 self._failure_message = msg  # FIXME HACK use progenitor instead
-                return {COOLDOWN: msg,}
+                return {COOLDOWN: msg,
+                        'http_status_code': resp.status_code,
+                        'pio_status_code': sc,
+                        'error_message': em,}
                 # can't return here because of the cache
             except Exception as e:
                 log.exception(e)
