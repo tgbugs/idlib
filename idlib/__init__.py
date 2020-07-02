@@ -1,3 +1,4 @@
+from idlib import exceptions as exc
 from idlib.utils import families
 from idlib.streams import (Stream,
                            HelperNoData,
@@ -26,17 +27,27 @@ StreamUri._id_class = Uri
 
 def get_right_id(uri):
     # FIXME this is a bad way to do this ...
+    class StreamUriTemp(StreamUri):
+        def asUri(self):
+            return self.identifier
+
     if isinstance(uri, Doi) or 'doi' in uri and '/doi/' not in uri:
         if isinstance(uri, Doi):
             di = uri
         elif 'doi' in uri:
             di = Doi(uri)
 
-        pi = di.dereference(Pio)
+        try:
+            pi = di.dereference(Pio)
+        except exc.MalformedIdentifierError:
+            pi = di.dereference(StreamUriTemp)
 
     else:
         if not isinstance(uri, Pio):
-            pi = Pio(uri)  #.normalize()
+            try:
+                pi = Pio(uri)  #.normalize()
+            except exc.MalformedIdentifierError:
+                pi = StreamUriTemp(uri)
         else:
             pi = uri
 
