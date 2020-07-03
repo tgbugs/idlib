@@ -7,7 +7,7 @@ from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache
-from idlib.utils import cache_result, log
+from idlib.utils import cache_result, log, base32_crockford_decode
 from idlib.config import auth
 
 
@@ -30,8 +30,6 @@ class RorId(oq.OntId, idlib.Identifier):
     # since the prefix is redundant with the identifier type?
     # initial answer: yes
 
-    _index = {c:i for i, c in enumerate('0123456789abcdefghjkmnpqrstvwxyz')}
-    _base = len(_index)
     canonical_regex = '^https://ror.org/0[0-9a-z]{6}[0-9]{2}$'
 
     def __new__(cls, *args, **kwargs):
@@ -51,14 +49,7 @@ class RorId(oq.OntId, idlib.Identifier):
             return False
 
         chars, checksum = match.groups()
-
-        # NOTE this assume normalization and downcasing happened in a previous step
-        # NOTE base32 crockford is big endian under string indexing, * self._base
-        # acts to move the previous number(s) to the left by one place in that base
-        number = 0
-        for c in chars:
-            number = number * self._base + self._index[c]
-
+        number = base32_crockford_decode(chars)
         check = 98 - ((number * 100) % 97)
         return check == int(checksum)
 

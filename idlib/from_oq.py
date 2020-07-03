@@ -9,7 +9,11 @@ from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache, COOLDOWN
-from idlib.utils import log, TZLOCAL, cache_result
+from idlib.utils import (log,
+                         TZLOCAL,
+                         cache_result,
+                         base32_pio_encode,
+                         base32_pio_decode)
 from idlib.config import auth
 
 
@@ -93,6 +97,18 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _local_conventions = _namespaces
     canonical_regex = '^https://www.protocols.io/(view|edit|private|file-manager|api/v3/protocols)/'
 
+    _slug_0_limit = 128  # 113 < ??? < 136
+    _slug_0_m = 8
+    _slug_0_b = 66010867
+
+    _slug_1_limit = 671  # 651 < ??? < 671
+    _slug_1_m = 8
+    _slug_1_b = 280510195
+
+    _slug_2_limit = 2082  # 2080 < 2082 < 2088
+    _slug_2_m = 1024 ** 2 + 8  # 1048584
+    _slug_2_b = 2111848180
+
     def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
         if curie_or_iri is None and iri:
             curie_or_iri = iri
@@ -134,7 +150,86 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
 
     @property
     def slug_tail(self):
-        return self.slug.rsplit('-', 1)[-1]
+        if self.is_int():
+            id = self.identifier_int
+            if id < self._slug_0_limit:
+                # the change happens somewhere between 113 and 136
+                # superstition tells me that it is probably at 128 or 127
+                # depending on the indexing used
+                m = self._slug_0_m
+                b = self._slug_0_b  # 66010867
+                return base32_pio_encode(id * m + b)
+            elif id < self._slug_1_limit:
+                # the change happens somewhere between 651 and 671
+                #m = 8
+                #b = 280510195
+                m = self._slug_1_m
+                b = self._slug_1_b  # 66010867
+                return base32_pio_encode(id * m + b)
+            if id < self._slug_2_limit:
+                # old impl that chops out the middle a
+                m = self._slug_2_m
+                b = self._slug_2_b - 1
+                #full = base32_pio_encode(id * self._slug_2_m + self._slug_2_b - 1)
+                full = base32_pio_encode(id * m + b)
+                return full[:3] + full[-3:]
+            else:
+                m = self._slug_2_m
+                b = self._slug_2_b
+                return base32_pio_encode(id * m + b)
+        else:
+            return self.slug.rsplit('-', 1)[-1]  # FIXME private issue ...
+
+    @property
+    def identifier_int(self):
+        if self.is_int():
+            return int(self.suffix)
+
+        elif not self.is_private():
+            st = self.slug_tail
+            if len(st) == 6:
+                if st.startswith('b88'):  # FIXME magic number
+                    m = self._slug_0_m
+                    b = self._slug_0_b
+                elif st.startswith('ims'):  # FIXME magic number
+                    m = self._slug_1_m
+                    b = self._slug_1_b
+                elif st.startswith('mw9'):  # FIXME magic number
+                    raise NotImplementedError('lacking examples')
+                    #m = self._slug_1?_m
+                    #b = self._slug_1?_b
+                elif st.startswith('kx3'):  # FIXME magic number
+                    raise NotImplementedError('lacking examples')
+                    #m = self._slug_1?_m
+                    #b = self._slug_1?_b
+                elif st.startswith('iwg'):  # FIXME magic number
+                    raise NotImplementedError('lacking examples')
+                    #m = self._slug_1?_m
+                    #b = self._slug_1?_b
+                elif st.startswith('kva'):  # FIXME magic number
+                    # FIXME make params accessible
+                    m = 8
+                    b = 355483379
+                else:
+                    # old impl that removes the middle a
+                    # this affects identifiers < 2082
+                    st = st[:3] + 'a' + st[3:]
+                    m = self._slug_2_m
+                    b = self._slug_2_b - 1
+            else:
+                m = self._slug_2_m
+                b = self._slug_2_b
+
+            # y = mx + b
+            d, r = divmod((base32_pio_decode(st) - b), m)
+            if r:  # we are in the strange low number regiem ?
+                breakpoint()
+
+            return d
+
+    @property
+    def uri_api_int(self):
+        return self.__class__(prefix='pio.api', suffix=str(self.identifier_int))
 
     def _checksum(self, cypher):
         m = cypher()
@@ -144,6 +239,8 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     def is_private(self):
         return self.prefix == 'pio.private'
 
+    def is_int(self):
+        return self.prefix == 'pio.api' and self.suffix.isdigit()
 
 def setup(cls, creds_file=None):
     """ because @classmethod only ever works in a single class SIGH """
@@ -225,7 +322,7 @@ class Pio(idlib.Stream):
         if data:
             uri = data['uri']
             if uri:
-                return self.__class__.fromIdInit(prefix='pio.view', suffix=uri)
+                return self.fromIdInit(prefix='pio.view', suffix=uri)
 
     id_bound_metadata = uri_human  # FIXME vs uri field
     identifier_bound_metadata = id_bound_metadata
@@ -237,7 +334,15 @@ class Pio(idlib.Stream):
     id_bound_ver_metadata = id_bound_metadata
     identifier_bound_version_metadata = id_bound_ver_metadata
 
-    def data(self):
+    @property
+    def identifier_int(self):
+        return self.data()['id']
+
+    @property
+    def uri_api_int(self):
+        return self.fromIdInit(prefix='pio.api', suffix=str(self.identifier_int))
+
+    def data(self, fail_ok=False):
         if not hasattr(self, '_data'):
             self._progenitors = {}
             apiuri = self.identifier.uri_api
@@ -257,8 +362,10 @@ class Pio(idlib.Stream):
 
                 sc = blob['pio_status_code']
                 if sc == 212:  # Protocol does not exist
+                    if fail_ok: return
                     raise exc.IdDoesNotExistError(message)
                 elif sc in (250, 205):  # access requested, not authorized
+                    if fail_ok: return
                     raise exc.NotAuthorizedError(message)
                 else:
                     msg = f'unhandled pio status code {sc}\n' + message
@@ -309,7 +416,9 @@ class Pio(idlib.Stream):
         m = cypher()
         # FIXME TODO hasing of python objects ...
         metadata = self.metadata()
-        m.update(self.identifier.checksum(cypher))
+        #m.update(self.identifier.checksum(cypher))
+        # XXX self.identifer cannot be included because
+        # it makes it impossible to dealias tha various different referents
         m.update(self.id_bound_metadata.identifier.checksum(cypher))
         #m.update(self.version_id)  # unix epoch -> ??
         m.update(self.updated.isoformat().encode())  # in principle more readable
@@ -377,6 +486,21 @@ class Pio(idlib.Stream):
         return (self.identifier.iri
                 if asType is None else
                 asType(self.identifier.iri))
+
+    def asDict(self, include_description=False, include_private=True):
+        if self.identifier.is_int():
+            out = super().asDict(include_description)
+            out['uri_human'] = self.uri_human.identifier  # prevent double embedding
+            doi = self.doi
+            if doi is not None:
+                out['doi'] = doi
+            return out
+        else:
+            uri_api_int = self.uri_api_int
+            out = uri_api_int.asDict(include_description)
+            if include_private and self.identifier.is_private():
+                out['uri_private'] = self.identifier  # FIXME some way to avoid leaking these if needed?
+            return out
 
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):

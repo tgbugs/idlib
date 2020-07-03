@@ -72,3 +72,56 @@ def cache_result(method):
         return out
 
     return inner
+
+
+def makeEnc(alphabet):
+    index = {c:i for i, c in enumerate(alphabet)}
+    iindex = {v:k for k, v in index.items()}
+    base = len(index)
+
+    def encode(number, *, _iindex=iindex, _base=base):
+        chars = ''
+        while number > 0:
+            number, rem = divmod(number, _base)
+            chars = _iindex[rem] + chars
+
+        return chars
+
+    def decode(chars, *, _index=index, _base=base):
+        number = 0
+        for c in chars:
+            number = number * _base + _index[c]
+
+        return number
+
+
+    return encode, decode
+
+
+# NOTE this assume normalization and downcasing happened in a previous step
+# NOTE base32 crockford is big endian under string indexing, * self._base
+# acts to move the previous number(s) to the left by one place in that base
+crockford_alphabet = '0123456789abcdefghjkmnpqrstvwxyz'
+zooko_alphabet     = 'ybndrfg8ejkmcpqxot1uwisza345h769'
+pio_alphabet       = 'abcdefghijkmnpqrstuvwxyz23456789'  # start with d is fun
+rfc_alphabet       = 'abcdefghijklmnopqrstuvwxyz234567'
+
+(
+    base32_crockford_encode,
+    base32_crockford_decode,
+ ) = makeEnc(crockford_alphabet)
+
+(
+    base32_zooko_encode,
+    base32_zooko_decode,
+) = makeEnc(zooko_alphabet)
+
+(
+    base32_pio_encode,
+    base32_pio_decode,
+) = makeEnc(pio_alphabet)
+
+(
+    base32_rfc_encode,
+    base32_rfc_decode,
+) = makeEnc(rfc_alphabet)

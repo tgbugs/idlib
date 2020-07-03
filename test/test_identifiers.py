@@ -243,6 +243,25 @@ class TestPio(HelperStream, unittest.TestCase):
     ids = [
         'https://www.protocols.io/view/reuse-pc3diyn',
         'https://www.protocols.io/private/8DAE4D2451D5FE18A421D102BC2BEB39',
+
+        #'https://www.protocols.io/view/103',
+        #'https://www.protocols.io/view/106',
+
+        'https://www.protocols.io/view/113',
+        # changeover happens 128 maybe?
+        'https://www.protocols.io/view/136',
+
+        #'https://www.protocols.io/view/622',
+
+        'https://www.protocols.io/view/650',
+
+        'https://www.protocols.io/view/651',
+        # changover somewhere in here
+        'https://www.protocols.io/view/671',
+
+        'https://www.protocols.io/view/2080',
+        # changeover likely at a -> b 2081 -> 2082
+        'https://www.protocols.io/view/2088',
     ]
     ids_bad = ['lol not an identifier']
 
@@ -251,7 +270,22 @@ class TestPio(HelperStream, unittest.TestCase):
             d = self.stream(i)
             print(d.creator.orcid)
             for a in d.authors:
-                print(a.orcid)
+                if hasattr(a, 'orcid'):
+                    print(a.orcid)
+
+    def test_id_int(self):
+        bads = []
+        for i in self.ids:
+            un = self.stream(i)
+            uh = un.uri_human
+            if un.identifier.is_int():
+                assert uh.identifier_int == un.identifier.identifier_int
+
+            if uh.identifier_int != uh.identifier.identifier_int:
+                bads.append(uh.identifier)
+
+        assert not bads, bads
+            
 
 
 @skipif_ci
