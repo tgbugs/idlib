@@ -66,7 +66,14 @@ class Stream:
         if isinstance(identifier, cls):
             return identifier
         else:
-            return cls(identifier)
+            i = cls(identifier)
+            i._progenitors = {}  # FIXME klobbered in self.data
+            # TODO what is our term for the atomic part of a
+            # stream into which no light may pass? it is different
+            # than the homogenous data, it is more along the lines
+            # of "this is some other data structure"
+            i._progenitors['blob'] = blob
+            return i
 
     @classmethod
     def fromIdInit(cls, *args, **kwargs):

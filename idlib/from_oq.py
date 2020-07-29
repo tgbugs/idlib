@@ -223,13 +223,23 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
             # y = mx + b
             d, r = divmod((base32_pio_decode(st) - b), m)
             if r:  # we are in the strange low number regiem ?
-                breakpoint()
+                msg = ("Haven't figured out the equation for slugs of the form "
+                       f'{st}. d = {d} r = {r}. The id may also be malformed.')
+                raise NotImplementedError(msg)
+                #breakpoint()
 
             return d
 
     @property
     def uri_api_int(self):
-        return self.__class__(prefix='pio.api', suffix=str(self.identifier_int))
+        pid = self.__class__(prefix='pio.api', suffix=str(self.identifier_int))
+        if not isinstance(pid._progenitors, dict):
+            # FIXME is are these really progenitors in the way we usually
+            # think of them? ... maybe not?
+            pid._progenitors = {}
+
+        pid._progenitors['id-converted-from'] = self
+        return pid
 
     def _checksum(self, cypher):
         m = cypher()
@@ -241,6 +251,7 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
 
     def is_int(self):
         return self.prefix == 'pio.api' and self.suffix.isdigit()
+
 
 def setup(cls, creds_file=None):
     """ because @classmethod only ever works in a single class SIGH """
@@ -336,15 +347,33 @@ class Pio(idlib.Stream):
 
     @property
     def identifier_int(self):
-        return self.data()['id']
+        try:
+            return self.data()['id']
+        except exc.RemoteError as e:
+            try:
+                return self.identifier.identifier_int
+            except NotImplementedError as e:
+                # internally it is not implemented
+                # externally it is a bad id
+                raise exc.MalformedIdentifierError(self.identifier) from e
 
     @property
     def uri_api_int(self):
-        return self.fromIdInit(prefix='pio.api', suffix=str(self.identifier_int))
+        pid = self.fromIdInit(prefix='pio.api', suffix=str(self.identifier_int))
+        if not isinstance(pid._progenitors, dict):
+            # FIXME is are these really progenitors in the way we usually
+            # think of them? ... maybe not?
+            pid._progenitors = {}
+
+        pid._progenitors['id-converted-from'] = self
+        return pid
 
     def data(self, fail_ok=False):
         if not hasattr(self, '_data'):
-            self._progenitors = {}
+            if not isinstance(self._progenitors, dict):
+                # XXX careful about the contents going stale
+                self._progenitors = {}
+
             apiuri = self.identifier.uri_api
             blob, path = self._get_data(apiuri)
             if 'stream-http' not in self._progenitors:
