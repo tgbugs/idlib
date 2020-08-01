@@ -273,8 +273,13 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
             triplified version of the record """
         s = self.asType(rdflib.URIRef)
         yield s, rdf.type, owl.NamedIndividual
-        if self.category:
-            yield s, rdf.type, rdflib.URIRef(TEMP[self.category])  # FIXME TODO
+        try:
+            if self.category:
+                yield s, rdf.type, rdflib.URIRef(TEMP[self.category])  # FIXME TODO
+        except exc.ResolutionError as e:
+            log.exception(e)
+            yield s, TEMP.resolutionError, rdflib.Literal(True)
+            pass
 
         yield s, rdfs.label, rdflib.Literal(self.label)
 
