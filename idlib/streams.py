@@ -433,13 +433,19 @@ class StreamUri(Stream):
     def id_bound_data(self):
         raise NotImplementedError
 
-    @cache_result
+    _dereference_cache = {}  # FIXME real caching please lru here probably?
+    @cache_result  # this is only per instance not globally
     def dereference_chain(self):
         # FIXME this is really dereference chain super
-        return tuple(StringProgenitor(resp.url, progenitor=resp)
-                     for resp in
-                     self._resolution_chain_responses(self.identifier_actionable,
-                                                raise_on_final=False))
+        dc = StreamUri._dereference_cache
+        if not self.identifier_actionable in dc:
+            dc[self.identifier_actionable] = tuple(
+                StringProgenitor(resp.url, progenitor=resp)
+                for resp in
+                self._resolution_chain_responses(self.identifier_actionable,
+                                                 raise_on_final=False))
+
+        return dc[self.identifier_actionable]
 
     @cache_result
     def dereference(self, asType=None):
