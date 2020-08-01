@@ -138,7 +138,13 @@ class Stream:
                 # 'alternate_identifiers': [],  # TODO
             }
 
-            if self.metadata() is not None:
+            try:
+                metadata = self.metadata()
+            except exc.RemoteError as e:
+                out['errors'] = [{'message': str(e)}]
+                return out
+
+            if metadata is not None:
                 out['label'] = self.label
                 if hasattr(self, 'category') and self.category:
                     out['category'] = self.category

@@ -352,10 +352,15 @@ class Pio(idlib.Stream):
         except exc.RemoteError as e:
             try:
                 return self.identifier.identifier_int
-            except NotImplementedError as e:
+            except NotImplementedError as e2:
                 # internally it is not implemented
                 # externally it is a bad id
-                raise exc.MalformedIdentifierError(self.identifier) from e
+                # raise the remote error since that is what consumers of this
+                # property expect
+                try:
+                    raise e from exc.MalformedIdentifierError(self.identifier)
+                except Exception as e3:
+                    raise e3 from e2
 
     @property
     def uri_api_int(self):
@@ -525,11 +530,15 @@ class Pio(idlib.Stream):
                 out['doi'] = doi
             return out
         else:
-            uri_api_int = self.uri_api_int
-            out = uri_api_int.asDict(include_description)
-            if include_private and self.identifier.is_private():
-                out['uri_private'] = self.identifier  # FIXME some way to avoid leaking these if needed?
-            return out
+            try:
+                uri_api_int = self.uri_api_int
+                out = uri_api_int.asDict(include_description)
+                if include_private and self.identifier.is_private():
+                    out['uri_private'] = self.identifier  # FIXME some way to avoid leaking these if needed?
+                return out
+            except exc.RemoteError as e:
+                # we don't have any metadata but we will return what little info we have
+                return super().asDict(include_description)
 
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
