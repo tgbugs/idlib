@@ -364,7 +364,16 @@ class Pio(idlib.Stream):
 
     @property
     def uri_api_int(self):
-        pid = self.fromIdInit(prefix='pio.api', suffix=str(self.identifier_int))
+        idint = self.identifier_int
+
+        if idint is None:
+            return
+
+        if not isinstance(idint, int):
+            raise TypeError(f'what the {idint}')
+
+        pid = self.fromIdInit(prefix='pio.api', suffix=str(idint))
+
         if not isinstance(pid._progenitors, dict):
             # FIXME is are these really progenitors in the way we usually
             # think of them? ... maybe not?
