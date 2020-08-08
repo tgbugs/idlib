@@ -118,7 +118,7 @@ class Stream:
             try:
                 if not self.label:
                     return local
-            except exc.ResolutionError as e:
+            except (exc.ResolutionError, exc.RemoteError) as e:
                 log.exception(e)
                 return local
 
@@ -445,11 +445,21 @@ class StreamUri(Stream):
         # FIXME this is really dereference chain super
         dc = StreamUri._dereference_cache
         if not self.identifier_actionable in dc:
-            dc[self.identifier_actionable] = tuple(
-                StringProgenitor(resp.url, progenitor=resp)
-                for resp in
-                self._resolution_chain_responses(self.identifier_actionable,
-                                                 raise_on_final=False))
+            try:
+                dc[self.identifier_actionable] = tuple(
+                    StringProgenitor(resp.url, progenitor=resp)
+                    for resp in
+                    self._resolution_chain_responses(self.identifier_actionable,
+                                                     raise_on_final=False))
+            except (exc.ResolutionError, exc.RemoteError) as e:
+                # TODO
+                # FIXME partial resolution is a complete nightmare
+                # to handle >_< ... I don't want to include null
+                # pointers here, but we can't just throw an error
+                # for a partially resolved chain, I thinkwe have
+                # raise with the partial chain as a value in the
+                # error
+                raise e
 
         return dc[self.identifier_actionable]
 

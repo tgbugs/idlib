@@ -3,18 +3,32 @@ import idlib
 from idlib import families
 
 
-class Iri(oq.OntId, idlib.Identifier):  # FIXME OntId is only temporary
+class IriId(oq.OntId, idlib.Identifier):  # FIXME OntId is only temporary
     """ """
     _family = families.IETF
 
 
-class Uri(Iri):
+class UriId(IriId):
     """ """
     _family = families.IETF
 
     # FIXME code duplication
 
     # canonicalize the uri
+
+
+class Uri(idlib.StreamUri):
+
+    _id_class = UriId
+
+    def __gt__(self, other):
+        if isinstance(other, idlib.Stream):
+            return self.identifier > other.identifier
+        else:
+            return False  # FIXME TODO
+
+    def asUri(self):
+        return self._identifier
 
 
 class CompactifiedTemplate(Uri):

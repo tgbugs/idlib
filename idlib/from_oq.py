@@ -654,7 +654,12 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
         # passed along the scope unless the decorated function
         # does it manually, which kinda defeats the point
 
+        _old_prog = self._progenitors
         self._progenitors = {}
+        for k in ('id-converted-from',): # TODO generalize to persistent progs
+            if k in _old_prog:
+                self._progenitors[k] = _old_prog[k]
+
         blob, path = self._get_data(self._id_act_metadata, _refresh_cache=True)
         return self.metadata()
 

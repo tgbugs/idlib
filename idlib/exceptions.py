@@ -6,6 +6,11 @@ class IdlibError(Exception):
 
 class ResolutionError(IdlibError):
     """ something went wrong """
+    # FIXME this will be confusing and I'm fairly certain that
+    # we should split into NetworkError/TimeoutError
+    # and then have RemoteError, because Resolution error is
+    # ambiguous, it is the superclass for all of them I think
+
 
 class MalformedIdentifierError(IdlibError):
     """ Your input cannot be determined to be of the
