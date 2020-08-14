@@ -1,0 +1,104 @@
+#+title: Ramblings on Identifiers
+#+author: Tom Gillespie
+
+* What makes a good identifier? What makes an identifier as opposed to just a string? What makes a good identifier grammar?
+In theory any arbitrary string is an identifier. What it identifies is a different issue.
+However, not all arbitrary strings are equally useful as identifiers, and some have
+decidedly nasty properties depending on how they are constructed.
+
+Even in typed languages, data from an untrusted source must be parsed to ensure that
+its internal structure matches the type.
+
+Practically this means that good identifiers must be parsable by turning incomplete systems.
+
+1. Identifiers must be parsed.
+   Parsing may be a simple as checking that the identifier
+   contains only 0 or 1, or may be arbitrarily complex.
+
+2. Any string can be an identifier.
+3. The procedures needed to determine key properties of an identifier must provably halt.
+   Identity. The equality and equivalence of two identifiers (they are not necessarily the same).
+   [fn::This is why in other places I talk about an 'identity-function' the terminology is incorrect,
+   but the idea is essentially that you can have as many functions as you want to will tell you whether
+   two things are the same or different, and what matters is the properties of the function you choose.
+   If I choose to use =(lambda (a b) (equal? (type-of a) (type-of b)))= as my equivalence function I am
+   going find out that a whole bunch of things are equal because the function throws away data]
+   Structure. The well-formedness of the internal structure of an identifier.
+
+4. 
+
+5. Good identifiers use parsers that are guranteed to halt.
+6. Good identifier systems have identif
+7. The grammar for identifiers should
+8. 
+
+Default accepting vs default rejecting systems. UNIX vs Lisp
+
+* What makes a good resolver/client?
+Clients/resolvers must specify a finite maximum runtime and should
+accept a timeout as an argument with guranteed return within some
+delta of that timeout.
+
+The must return one of the following with regard to the thing dereferenced to.
++1. found+
++2. unknown (timeout)+
++3. not found+
+
+* Success and failure modes when querying a system
+** local
+client errors
+*** could-not-ask-the-question
+network down for some reason
+server did not respond
+** remote
+server responses
+*** prelude
+how do you deal with people trying to infer information or use a side channel attack
+e.g. Do you have a document on some-classified-topic or some-secret-code-name
+where the human answer is "I can neither confirm nor deny the existence of such a name"
+Of course that non-answer is not effective at all because most of the time you will
+have been getting nice normal answers, and when you cross over into a new logical
+space it is immediately obvious that information is being hidden, so basically the
+system has to not answer any questions at all to people who aren't authorized to
+be able to infer whether or not something like that exists, or just answer with
+
+essentially these cases would get translated up into =unknown-incomplete=
+because the system would know that there was somewhere that it is not allowed
+to look and thus can infer that it cannot definitively say that a record does not exist
+**** your-are-not-authorized-to-ask-this-question
+**** i-am-not-authorized-to-answer-this-question
+**** i-am-not-authorized-to-answer-this-question-to-you
+**** i-cant-tell-you-that-dave
+*** exists
+a record exists in this system prior in time to this query
+*** does-not-exist
+no record exits in this system prior in time to this query
+
+ideally this would also return a list of other systems that
+could be searched for such records, though integer records
+are obviously problematic, should return the number of records searched
+*** used-to-exist
+was deleted, but we keep a record of the fact that yes, once upon a time such as record existed
+this is critical for avoiding the kind of gaslighting insanity that deleting metadata produces
+*** malformed
+the identifier is malformed
+*** not-indexed-here
+if the type of identifier can be recognized
+
+but cannot be resolved by the current system, see other maybe? FIXME naming
+most likely an issue for handles/arks
+*** unknown-timeout
+no record could be found in the time allotted for search
+
+essentially, I was not able to find such a record, but I didn't check everything
+ideally should return the number of records searched along with an estimate
+of the number left to search, also the average time the system takes to find a record
+*** unknown-incomplete
+no record could be found but I couldn't check everything
+
+because access to a known part of the system is down
+*** ambiguous
+usually returned when a local identifier is provided
+
+e.g. not enough context if some context is inferred from
+an api key or something like that, but that might be cheating
