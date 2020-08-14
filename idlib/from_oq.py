@@ -146,6 +146,10 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     def slug(self):
         if self.suffix is None:
             breakpoint()
+
+        if self.suffix == 'None':
+            log.warning(f'You have a Pio suffix that is the string \'None\'')
+
         return self.suffix.rsplit('/', 1)[0] if '/' in self.suffix else self.suffix
 
     @property
@@ -185,50 +189,56 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
         if self.is_int():
             return int(self.suffix)
 
-        elif not self.is_private():
-            st = self.slug_tail
-            if len(st) == 6:
-                if st.startswith('b88'):  # FIXME magic number
-                    m = self._slug_0_m
-                    b = self._slug_0_b
-                elif st.startswith('ims'):  # FIXME magic number
-                    m = self._slug_1_m
-                    b = self._slug_1_b
-                elif st.startswith('mw9'):  # FIXME magic number
-                    raise NotImplementedError('lacking examples')
-                    #m = self._slug_1?_m
-                    #b = self._slug_1?_b
-                elif st.startswith('kx3'):  # FIXME magic number
-                    raise NotImplementedError('lacking examples')
-                    #m = self._slug_1?_m
-                    #b = self._slug_1?_b
-                elif st.startswith('iwg'):  # FIXME magic number
-                    raise NotImplementedError('lacking examples')
-                    #m = self._slug_1?_m
-                    #b = self._slug_1?_b
-                elif st.startswith('kva'):  # FIXME magic number
-                    # FIXME make params accessible
-                    m = 8
-                    b = 355483379
-                else:
-                    # old impl that removes the middle a
-                    # this affects identifiers < 2082
-                    st = st[:3] + 'a' + st[3:]
-                    m = self._slug_2_m
-                    b = self._slug_2_b - 1
+        elif self.is_private():
+            # NOTE private ids are NOT random (which is likely bad)
+            # and further more show consecutive behavior
+            # which means that one is guessable from other (very bad)
+            msg = ("Haven't figured out the equation for private -> id")
+            raise NotImplementedError(msg)
+
+        st = self.slug_tail
+        if len(st) == 6:
+            if st.startswith('b88'):  # FIXME magic number
+                m = self._slug_0_m
+                b = self._slug_0_b
+            elif st.startswith('ims'):  # FIXME magic number
+                m = self._slug_1_m
+                b = self._slug_1_b
+            elif st.startswith('mw9'):  # FIXME magic number
+                raise NotImplementedError('lacking examples')
+                #m = self._slug_1?_m
+                #b = self._slug_1?_b
+            elif st.startswith('kx3'):  # FIXME magic number
+                raise NotImplementedError('lacking examples')
+                #m = self._slug_1?_m
+                #b = self._slug_1?_b
+            elif st.startswith('iwg'):  # FIXME magic number
+                raise NotImplementedError('lacking examples')
+                #m = self._slug_1?_m
+                #b = self._slug_1?_b
+            elif st.startswith('kva'):  # FIXME magic number
+                # FIXME make params accessible
+                m = 8
+                b = 355483379
             else:
+                # old impl that removes the middle a
+                # this affects identifiers < 2082
+                st = st[:3] + 'a' + st[3:]
                 m = self._slug_2_m
-                b = self._slug_2_b
+                b = self._slug_2_b - 1
+        else:
+            m = self._slug_2_m
+            b = self._slug_2_b
 
-            # y = mx + b
-            d, r = divmod((base32_pio_decode(st) - b), m)
-            if r:  # we are in the strange low number regiem ?
-                msg = ("Haven't figured out the equation for slugs of the form "
-                       f'{st}. d = {d} r = {r}. The id may also be malformed.')
-                raise NotImplementedError(msg)
-                #breakpoint()
+        # y = mx + b
+        d, r = divmod((base32_pio_decode(st) - b), m)
+        if r:  # we are in the strange low number regiem ?
+            msg = ("Haven't figured out the equation for slugs of the form "
+                    f'{st}. d = {d} r = {r}. The id may also be malformed.')
+            raise NotImplementedError(msg)
+            #breakpoint()
 
-            return d
+        return d
 
     @property
     def uri_api_int(self):
@@ -365,9 +375,6 @@ class Pio(idlib.Stream):
     @property
     def uri_api_int(self):
         idint = self.identifier_int
-
-        if idint is None:
-            return
 
         if not isinstance(idint, int):
             raise TypeError(f'what the {idint}')
@@ -541,6 +548,11 @@ class Pio(idlib.Stream):
         else:
             try:
                 uri_api_int = self.uri_api_int
+                if uri_api_int is None:
+                    # This should trigger a remote error, if not, we want to
+                    # know because something very strange is going on
+                    self.data()
+
                 out = uri_api_int.asDict(include_description)
                 if include_private and self.identifier.is_private():
                     out['uri_private'] = self.identifier  # FIXME some way to avoid leaking these if needed?
