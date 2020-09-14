@@ -1,4 +1,5 @@
 import requests
+from . import exceptions as exc
 
 
 def resolution_chain(iri):
