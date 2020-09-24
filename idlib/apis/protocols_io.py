@@ -69,7 +69,7 @@ def get_auth_code(url):
 
 def get_protocols_io_auth(creds_file,
                           store_file=auth.get_path('protocols-io-api-store-file'),
-                          SCOPES = 'readwrite'):
+                          SCOPES='readwrite'):
 
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
