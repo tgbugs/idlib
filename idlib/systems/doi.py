@@ -160,8 +160,8 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
         else:
             try:
                 self._resp_metadata.raise_for_status()
-            except BaseException as e:
-                raise exc.ResolutionError(identifier) from e
+            except Exception as e:
+                raise exc.RemoteError(identifier) from e
 
     @cache_result  # FIXME very much must cache these
     def _checksum(self, cypher):  # FIXME unqualified checksum goes to ... metadata ???

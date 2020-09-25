@@ -100,6 +100,17 @@ class Stream:
                 else:
                     self._identifier = self._id_class(identifier_or_id_as_string)
 
+    @property
+    def label(self):
+        raise NotImplementedError('impl in subclass')
+
+    @property
+    def label_safe(self):
+        try:
+            return self.label
+        except exc.RemoteError:
+            return self.asStr()
+
     def asType(self, _class):
         # FIXME not quite ... but close
         if hasattr(self, '_id_class'):

@@ -506,6 +506,14 @@ class Pio(idlib.Stream):
     label = title
 
     @property
+    def label_safe(self):
+        """don't fail if data access is missing """
+        try:
+            return self.label
+        except exc.RemoteError:
+            return self.identifier.slug
+
+    @property
     def creator(self):
         return PioUser('pio.user:' + self.data()['creator']['username'])
 
