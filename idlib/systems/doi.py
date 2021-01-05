@@ -179,7 +179,7 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
         # both datacite and crossref produce in turtle
         resp = self._requests.get(self.identifier, headers={'Accept': 'text/turtle'})
         self._ttl_resp = resp
-        ct = resp.headers['Content-Type']
+        ct = resp.headers['Content-Type']  # FIXME this can KeyError !?
         if 'text/html' in ct:
             # sigh blackfynn
             log.warning(f'{resp.url} is not turtle it is {ct}')  # FIXME duplicate log messages happen here

@@ -70,9 +70,9 @@ def get_auth_code(url):
 def get_protocols_io_auth(creds_file,
                           store_file=auth.get_path('protocols-io-api-store-file'),
                           SCOPES='readwrite'):
-
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
+    from idlib import exceptions as exc
 
     InstalledAppFlowConsole = type('InstalledAppFlowConsole',
                                    (ConsoleHelper, InstalledAppFlow),
@@ -91,7 +91,10 @@ def get_protocols_io_auth(creds_file,
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                raise exc.RemoteError('protocols.io refresh error') from e
         else:
             flow = InstalledAppFlowConsole.from_client_secrets_file(creds_file.as_posix(), SCOPES)
             creds = flow.run_console_only()

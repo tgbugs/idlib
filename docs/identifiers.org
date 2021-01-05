@@ -44,12 +44,74 @@ The must return one of the following with regard to the thing dereferenced to.
 +2. unknown (timeout)+
 +3. not found+
 
+* Query types
+something about checking whether cached values match during
+negotiation
+
+** exists
+
+** exists-and-deref
+
+#+begin_src elisp :eval never
+(defun exists-and-deref (id)
+  (and (exists id) (deref id)))
+#+end_src
+
 * Success and failure modes when querying a system
 ** local
 client errors
 *** could-not-ask-the-question
 network down for some reason
 server did not respond
+** reachability
++inbetween+
+traversal error?
+*** prelude
+**** telephone
+While it would be nice if we could abstract away the process of
+getting from an identifier to its referent entirely and pretend that
+we can always get an answer existing systems for resolving identifiers
+on the web are horribly broken because they make extensive use of the
+redirect system, which means that there isn't a dereferencing process
+so much as there is a completely insane game of telephone. See
+[[https://www.youtube.com/watch?v=T4VjLW2K2KQ][Understanding the Web, How Theory and Practice Diverge]]
+by Henry S. Thompson for an introduction to the madness.
+
+The game of telephone is basically a bunch of repeated conversations
+along the lines of "Hello, I am looking for the referent of so-and-so
+identifier, and the last person I asked told me that I might be able
+to find under the address that I have contacted you at? Sorry, we
+don't have the referent of so-and-so at that address, but we do have a
+note that you can ask yet-another-system about yet-another-identifier
+and you might or might not find it there. Good luck!
+
+At any point someone could interpose and say "why yes we are the
+referent of so-and-so!" without a shred of evidence. All of this
+series of redirects is a complete failure of engineering, or rather
+the kind of runaround that is only acceptable because round-trip times
+are milliseconds not minutes. If I need to ask about a library book on
+Mars the current engineering solution is laughably, soul destroyingly,
+inadequate. It makes horrible assumptions about the cost of repeated
+messages and makes it impossible to reason about the actual underlying
+architecture of the system.
+
+This system is ... problematic. To see why, consider for a moment
+trying to resolve a DOI as a researcher working on Mars. If, after
+stewing for a moment, this does not evoke a deep sense of concern
+accompanied by hysterical laughter, let me know, you might have a
+clearer picture of what could happen than I do.
+*** redirection
+I am so angry that this exists.
+
+This is not allowed.  All redirection is an error.  A single
+redirection may be allowed in certain special cases where the social
+structure of the identifier system makes it difficult to hide the
+implementation details.
+*** redirection-failed
+*** transport protocol etc. issues
+ssl errors
+511 errors
+505 errors maybe? no, that falls under unknown errors
 ** remote
 server responses
 *** prelude
@@ -65,18 +127,91 @@ be able to infer whether or not something like that exists, or just answer with
 essentially these cases would get translated up into =unknown-incomplete=
 because the system would know that there was somewhere that it is not allowed
 to look and thus can infer that it cannot definitively say that a record does not exist
-**** your-are-not-authorized-to-ask-this-question
+**** you-are-not-authorized-to-ask-this-question
+This has a flavor of impossible universality because it implies that
+the universe has somehow make it impossible for you to even form the
+question. If it has to be operationalized, it would probably mean that
+the facade that the local user agent serves the user is broken and the
+request cannot even be sent. There are cases where this is important,
+such as when the user agent only has access to an unsecured network.
+In this situation this situation expands to a case where the local
+computer is now a remote because the user does not have control over
+it, or at least not over the subprocess that is running. An alternate
+interpretation is that the asker is on a universal blacklist
+maintained for all connected agents in the remote system, the
+semantics here are significantly different because one requires a
+connection to be established. In theory one way a remote system could
+try to manage this would be to put up a firewall but those can be
+detect as distinct from a connection error unless the remote controls
+the transport network too.
+**** you-are-not-authorized-to-receive-an-answer-to-this-question
+This is the universal form of
+i-am-not-authorized-to-answer-this-question-to-you, it means that
+within the whole of the system known to the current remote agent there
+is none that will answer the question because the asker has been put
+on a blacklist. This is the version of
+you-are-not-authorized-to-ask-this-question that actually has meaning
+since it is enforceable by a system.
 **** i-am-not-authorized-to-answer-this-question
+This is a remote blacklist where the agent that has been connected to
+is not authorized. Usually this would be hidden from the user if it
+were just a single agent because it would be a bug. The more useful
+response would be more along the lines of "I am not authorized to
+answer this, but if you connect directly to this other agent they can
+answer it for you."  A concrete example of a case like this would be a
+request for identifying patient information where the computer system
+might know the data exists and even that the patient has an age, but
+cannot answer the question "how old is patient-20" because their
+system can't pull data from secure servers because it itself has not
+gone through the security review needed.
 **** i-am-not-authorized-to-answer-this-question-to-you
+Someone else might be authorized to answer this question to you. For
+example, an analyst might not be able to disclose certain information
+to someone lacking a certain level of clearance, but a senior
+commander might be allowed to tell someone with a lower level of
+clearance because they presumably can take responsibility for the
+action in the way that an analyst cannot.
+
+In the context of answering questions about whether identifiers exist
+or not, "Do you have records about a project with id MANHATTAN?"  is
+the case where the only secure answer is "I cannot answer questions
+about project ids." This implies that users would need to be blocked
+from making queries about entire subsets of a schema, so any query
+that touched one of those schema would have to be very careful,
+because a user could as questions to see which ones would hit a
+forbidden schema and in that way infer additional information about
+the structure of the query planner etc. I think the right thing to do
+in this case would be to return the parts of the query that could be
+answered without touching on that schema. However even this seems
+dangerous due to potential correlations between the contents of
+secured parts of a schema and unsecured parts. Consider for example
+the work that has been done on re-identifying patients using
+supposedly anonymized data. Yes you may be blocked from accessing the
+social security number of a patient (which is actually a completely
+useless thing to keep secret, but that is another matter) but if you
+have their age and place of birth you can massively reduce the search
+space needed to guess the SSN. Similarly if you can know the sex of
+the person but not their name, you can reduce the search space for
+their first name nearly in half. While some of these examples may not
+be security issues, it is extremely hard to draw the line between a
+correlation that is not a security issue and one that is. The
+non-random serial numbers on German tanks is a perfect example.
+**** i-am-not-authorized-to-speak-to-you-except-to-say-this-sentence
+i-am-only-authorized-to-say-this-exact-sentence-to-you-and-nothing-more-GOOD-DAY-SIR
 **** i-cant-tell-you-that-dave
 *** exists
 a record exists in this system prior in time to this query
+
+=a record exists=
 *** does-not-exist
 no record exits in this system prior in time to this query
 
-ideally this would also return a list of other systems that
-could be searched for such records, though integer records
-are obviously problematic, should return the number of records searched
+=no record exists= vs =no record has ever existed=?
+
+There is always doubt when you receive a negative answer.
+
+it probably makes more sense to use the 404 language here
+~not-found~ or ~not-found-anywhere-on-this-system~
 *** used-to-exist
 was deleted, but we keep a record of the fact that yes, once upon a time such as record existed
 this is critical for avoiding the kind of gaslighting insanity that deleting metadata produces
@@ -87,18 +222,29 @@ if the type of identifier can be recognized
 
 but cannot be resolved by the current system, see other maybe? FIXME naming
 most likely an issue for handles/arks
-*** unknown-timeout
-no record could be found in the time allotted for search
-
-essentially, I was not able to find such a record, but I didn't check everything
-ideally should return the number of records searched along with an estimate
-of the number left to search, also the average time the system takes to find a record
-*** unknown-incomplete
-no record could be found but I couldn't check everything
-
-because access to a known part of the system is down
+*** unknown
+not =a record exists= and not =no record exists=
+in this system prior in time to this query
+**** i-am-malfunctioning
+these are the 500 family of errors
 *** ambiguous
 usually returned when a local identifier is provided
 
 e.g. not enough context if some context is inferred from
 an api key or something like that, but that might be cheating
+* Promises that can be made by a system
+** remote
+*** immutable
+Promises that the remote data associated with this id will never
+change and can be cached indefinitely.
+
+Building systems that can _prove_ to remove systems that they are
+immutable is significantly more difficult. This is especially
+important for systems that need to be robust against censorship or
+accounting fraud. For example, systems that host official government
+statements, or business invoices. Every number needs to have a status.
+It cannot be possible to erase the existence of those without someone
+being able to at the very least know that it has been erased. This is
+why gapless increasing integers are a hard and fast requirement in
+those systems. They are one of the few ways that a remote system can
+protect itself and its users from deletion attacks.
