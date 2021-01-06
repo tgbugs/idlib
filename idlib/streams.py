@@ -255,7 +255,7 @@ class Stream:
             level == 0 -> returns self to break"""
 
         if args:
-            raise TypeError('progenitor acceps keywords arguments only!')
+            raise TypeError('progenitor accepts keywords arguments only!')
 
         # FIXME probably makes more sense to store progenitors in a dict
         # with a controlled set of types than just by accident of ordering

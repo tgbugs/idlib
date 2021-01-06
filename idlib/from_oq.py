@@ -415,6 +415,16 @@ class Pio(idlib.Stream):
                     if fail_ok: return
                     raise exc.IdDoesNotExistError(message)
                 elif sc in (250, 205):  # access requested, not authorized
+                    try:
+                        # there might be a private id in the progenitor chain
+                        nself = self.progenitor(type='id-converted-from')
+                        # FIXME TODO this works, but it would be nice if we
+                        # could use this to populate the cache for the public
+                        # api identifier as well
+                        return nself.data(fail_ok=fail_ok)
+                    except KeyError as e:
+                        pass
+
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
                 else:
