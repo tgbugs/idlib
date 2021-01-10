@@ -34,6 +34,85 @@ Practically this means that good identifiers must be parsable by turning incompl
 
 Default accepting vs default rejecting systems. UNIX vs Lisp
 
+* What is a local pid? All pids are local, so what makes a pid?
+A pid is something whose dereference doesn't change over the lifetime
+of the environment that it lives in.
+
+A local file path e.g. =/etc/nginx/nginx.conf= is a pid. It is missing
+certain nice features that some other pids have, such as the ability
+to have a stable reference to a specific version. Technically all
+posix file paths make no gurantees about the stability of their
+contents.
+
+=/etc/nginx/nginx.conf= would cease to be a PID the moment that that
+file could no longer be used to configure nginx, e.g. if that was
+moved to =/var/run/nginx/nginx.conf=. HOWEVER if that computer was
+taken offline permanently, and a new one booted up with a new
+environment then =/var/run/nginx/nginx.conf= could become a new
+persistent identifier, assuming that it never changes its practical
+semantics.
+
+You can see the sort of insanity that non-pids can produce in the kind
+of issues that use of non-persistent identifers caused in =/dev/=,
+where a keyboard might one day be identified by =/dev/input/event4=
+and the next reboot =/dev/input/event5=. Completely maddening, because
+to the human, the stable system is the whole computer with nothing
+plugged or unplugged.
+
+You can also run this logic in reverse to identify what the
+implementation _thinks_ is a stable environment. This is in fact more
+useful, because you can identify for example, that the URI system is
+composed of multiple different environments whose lifetime duration is
+maximally limited by the ownership of the domain name by a single
+party. Similarly, in our =/dev/= example, we can infer that the old
+way that udev was implemented had a definition of environment which
+was temporally restricted to be only for a single power on cycle of a
+computer.
+
+With these observations in hand it is much easier to identify how the
+actual behavior of a system diverges from the desired behavior for a
+pid.
+
+Consider for example that it is possible to infer that there is an
+environment of well defined extent where =/etc/nginx/nginx.conf= is
+the PID for the nginx config file. It covers a wide variety of systems
+running a posix file system that conform to common practice by linux
+distributions.  Windows and Macos fall outside that environment.
+Similarly, alternate distributions such as openresty also fall outside
+that environment under normal circumstances, unless a user configures
+openresty as a replacement for the system nginx.
+
+Identifying the environment, both temporal, spatial, informational,
+contextual, etc. over which the behavior of a pid is invariant is thus
+key to characterizing the real persistence gurantees.
+
+Note that this is a somewhat extended definition from the one that is
+usually given for pids, which is restricted primarily to the temporal
+domain. However consider the PID https://en.wikipedia.org/wiki/8964.
+There is are a large number of computer networks where that PID is not
+dereferencable or that might display contents that are divergent from
+the contents that are displayed if it were dereferenced in other
+environments.
+
+Thus it is possible to create a system for assessing the types of
+invariance that a given persistent identifier, or persistent
+identifier system is capable of providing. Most PID systems in use
+today intentionally lack a kind of invariance that is critical for a
+variety of use cases, namely content invariance up to some hash
+collision. Not all PID systems require those kinds of gurantees, and
+NO pid system that is used to track multiple versions of something
+across time _can_ have that property. There are an entire class of
+PIDs that are forever excluded from being able to use content
+invariant names, and they are often the most useful ones. Imagine if
+every time you went to a website you had to click on an embedded link
+to see the latest version of that website because it was imossible
+(hopefully) to guess the identifier of the next version. It would be a
+mess! If you want a PID that always dereferences to the "now" version
+of a thing (or the latest version), then you it cannot itself be
+content invariant. In a world where it was possible to implement a
+time traveling hash function that could hash all actual future
+versions of a file, then in principle you could do this, however in
+reality a level of indirection is necessary.
 * What makes a good resolver/client?
 Clients/resolvers must specify a finite maximum runtime and should
 accept a timeout as an argument with guranteed return within some
@@ -203,6 +282,25 @@ i-am-only-authorized-to-say-this-exact-sentence-to-you-and-nothing-more-GOOD-DAY
 a record exists in this system prior in time to this query
 
 =a record exists=
+*** exists-but
+**** data-in-transit
+**** transaction-in-process
+extend the notion of a database transaction to be something that can
+be of significant extent, thus you can initiate something like a
+transaction which involves putting tapes in the mail
+**** data-partially-available
+sometimes some portion of the data may have finished transit if it is
+of a type that is technically divisible and interpretable in parts then
+that works, if it is partially avaiable but cannot be parsed
+**** known-not-dereferenceable-yet
+consider having a record in an index but you know that it is being
+delivered in bulk on tape, metadata could be returned that included
+where it is in the transit process, or return a
+data-expected-to-be-available-after-datetime value or something
+**** temporarily-unavaiable
+undergoing maintenance
+**** awaiting-retrieval
+aka dereferencing in process, e.g. from glacier or something
 *** does-not-exist
 no record exits in this system prior in time to this query
 
