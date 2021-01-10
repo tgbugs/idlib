@@ -294,6 +294,14 @@ class Pio(idlib.Stream):
 
     _setup = classmethod(setup)
 
+    #_checked_whether_data_is_not_in_error = False
+    #_data_is_in_error = True
+    # we MUST assume that data is in error for all instances by
+    # default until they prove otherwise HOWEVER the problem is that
+    # you now also need another parameter which is whether you have
+    # checked to see if it is NOT in error, sigh maybe in error? sigh
+    # this becomes hasattr(self, '_data_in_error) and self._data_in_error
+
     def __new__(cls, *args, **kwargs):
         # sadly it seems that this has to be defined explicitly
         return super().__new__(cls)
@@ -339,7 +347,22 @@ class Pio(idlib.Stream):
     @cache_result  # caching this cuts time in half for 2 calls etc. 5s / 10s over 25k calls
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
-        data = self.data()
+        try:
+            data = self.data()
+        except exc.RemoteError as e:
+            data = None
+            try:
+                proj = self.progenitor(type='id-converted-from')
+                # it should not be the case that we somehow find a
+                # private id here because data would have traversed
+                # and found it already and gotten the metadata
+                # FIXME doi, other int, private should all not be here
+                if not proj.identifier.is_int():
+                    return proj
+                else:
+                    raise e
+            except KeyError as e2:
+                raise e
         if data:
             uri = data['uri']
             if uri:
@@ -391,6 +414,7 @@ class Pio(idlib.Stream):
 
     def data(self, fail_ok=False):
         if not hasattr(self, '_data'):
+            self._data_in_error = True
             if not isinstance(self._progenitors, dict):
                 # XXX careful about the contents going stale
                 self._progenitors = {}
@@ -433,6 +457,8 @@ class Pio(idlib.Stream):
             else:
                 self._status_code = blob['status_code']
                 self._data = blob['protocol']
+
+            self._data_in_error = False
 
         return self._data
 
@@ -556,9 +582,23 @@ class Pio(idlib.Stream):
                 asType(self.identifier.iri))
 
     def asDict(self, include_description=False, include_private=True):
+        """ XXX this should NEVER allow an error to escape.
+            Only return less information. """
         if self.identifier.is_int():
             out = super().asDict(include_description)
-            out['uri_human'] = self.uri_human.identifier  # prevent double embedding
+
+            try:
+                out['uri_human'] = self.uri_human.identifier  # prevent double embedding
+            except exc.RemoteError as e:
+                pass
+
+            if hasattr(self, '_data_in_error') and self._data_in_error:
+                return out
+
+            # NOTE if you started from a doi then it seems extremely unlikely
+            # that you would be in a sitution where data retrieval could fail
+            # which means that really only the uri_human case can fail and
+            # there still be a chance that there is a uri_human we can use
             doi = self.doi
             if doi is not None:
                 out['doi'] = doi

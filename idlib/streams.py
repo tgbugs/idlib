@@ -140,6 +140,8 @@ class Stream:
             raise NotImplementedError('TODO as needed')
 
     def asDict(self, include_description=False):
+        """ XXX this should NEVER allow an error to escape.
+            Only return less information. """
         if hasattr(self, '_id_class') and self._id_class:
             out = {
                 'type': 'identifier',
@@ -479,7 +481,19 @@ class StreamUri(Stream):
         drc = self.dereference_chain()
         uri = drc[-1]
         if asType:
-            return asType(uri)
+            nid = asType(uri)
+            if isinstance(nid, idlib.Stream):
+                if not isinstance(nid._progenitors, dict):
+                    # FIXME is are these really progenitors in the way we usually
+                    # think of them? ... maybe not?
+                    nid._progenitors = {}
+
+                # FIXME TODO do we want/need the full chain here?
+                nid._progenitors['id-dereferenced-from'] = self
+                # FIXME temporary bridge from StringProgenitor
+                nid._progenitors['stream-http'] = uri._progenitor
+
+            return nid
         else:
             # just return the strprg if no type is set
             # don't assume dereferencing is type preserving
