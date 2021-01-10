@@ -196,7 +196,9 @@ class TestRor(HelperStream, unittest.TestCase):
         'https://ror.org/02dqehb95',
         'https://ror.org/051fd9666',
     ]
-    ids_bad = []
+    ids_bad = [
+        'https://ror.org/05ht4p406',  # used to exist but api won't tell you that
+    ]
     for __i in ids:  # LOL PYTHON class scope list comprehensions
         ids_bad.append(__i.replace('https', 'http'))
     del __i

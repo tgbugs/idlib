@@ -116,11 +116,26 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         idq = self._id_class(prefix=prefix, suffix=suffix)
         self._resp_metadata = self._requests.get(idq)
         if self._resp_metadata.ok:
-            return self._resp_metadata.json()
+            blob = self._resp_metadata.json()
+            if len(blob) == 1 and 'errors' in blob:
+                errors = blob['errors']
+                if len(errors) == 1:
+                    error = errors[0]
+                    if 'does not exist' in error:
+                        # FIXME pretty sure this should be a used to
+                        # exist error in the example that causes this
+                        raise exc.IdDoesNotExistError(self.identifier)
+                    else:
+                        raise exc.RemoteError(error)
+                else:
+                    raise exc.RemoteError(' '.join(errors))
+            else:
+                return blob
         else:
             try:
                 self._resp_metadata.raise_for_status()
             except BaseException as e:
+                # FIXME may not be a resolution error
                 raise exc.ResolutionError(identifier) from e
 
     @property
@@ -175,7 +190,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             triplified version of the record """
         s = self.asType(rdflib.URIRef)
         a = rdf.type
-        yield s, a, owl.NamedIndividual
+        yield s, a, owl.NamedIndividual  # this goes first in the event the rest fail
         for osuffix in self.institutionTypes:
             o = TEMP[osuffix]
             yield s, a, o
