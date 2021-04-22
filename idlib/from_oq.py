@@ -5,6 +5,7 @@ import orthauth as oa
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import apis
+from idlib import formats
 from idlib import streams
 from idlib import exceptions as exc
 from idlib import conventions as conv
@@ -277,7 +278,7 @@ def setup(cls, creds_file=None):
         {'Authorization': 'Bearer ' + _pio_creds.token})
 
 
-class Pio(idlib.Stream):
+class Pio(formats.Rdf, idlib.Stream):
     """ instrumented protocols """
 
     _id_class = PioId
@@ -618,6 +619,31 @@ class Pio(idlib.Stream):
             except exc.RemoteError as e:
                 # we don't have any metadata but we will return what little info we have
                 return super().asDict(include_description)
+
+    def _triples_gen(self,
+                     rdflib=None,
+                     rdf=None,
+                     rdfs=None,
+                     owl=None,
+                     NIFRID=None,
+                     TEMP=None,
+                     **kwargs):
+
+        s = self.asType(rdflib.URIRef)
+
+        yield s, rdf.type, owl.NamedIndividual
+
+        if self.uri_human:
+            # XXX dereference checks should not be run here, they
+            # should be conduceded centrally during
+            yield s, TEMP.hasUriHuman, self.uri_human.asType(rdflib.URIRef)
+
+        if self.label:
+            yield s, rdfs.label, rdflib.Literal(self.label)
+
+        doi = self.doi
+        if doi is not None:
+            yield s, TEMP.hasDoi, doi.asType(rdflib.URIRef)
 
 
 class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
