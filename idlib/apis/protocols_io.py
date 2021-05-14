@@ -77,7 +77,7 @@ def get_protocols_io_auth(creds_file,
     InstalledAppFlowConsole = type('InstalledAppFlowConsole',
                                    (ConsoleHelper, InstalledAppFlow),
                                    {})
-    if store_file.exists():
+    if store_file and store_file.exists():
         with open(store_file, 'rb') as f:
             try:
                 creds = pickle.load(f)
