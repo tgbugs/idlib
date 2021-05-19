@@ -30,6 +30,7 @@ class RorId(oq.OntId, idlib.Identifier):
     # since the prefix is redundant with the identifier type?
     # initial answer: yes
 
+    local_regex = r'^0([0-9a-z]{6})([0-9]{2})$'
     canonical_regex = '^https://ror.org/0[0-9a-z]{6}[0-9]{2}$'
 
     def __new__(cls, *args, **kwargs):
@@ -43,8 +44,7 @@ class RorId(oq.OntId, idlib.Identifier):
         """ <https://github.com/ror-community/ror-api/blob/4f91dcb1c4cdeb1c44c92c8c82dc984081585293/
             rorapi/management/commands/convertgrid.py#L11> """
 
-        pattern = r'^0([0-9a-z]{6})([0-9]{2})$'
-        match = re.match(pattern, self.suffix)
+        match = re.match(self.local_regex, self.suffix)
         if match is None:
             return False
 

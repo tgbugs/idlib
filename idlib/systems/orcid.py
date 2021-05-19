@@ -28,6 +28,8 @@ OrcidPrefixes({'orcid': 'https://orcid.org/',
 class OrcidId(oq.OntId, idlib.Identifier):
     _namespaces = OrcidPrefixes
     _local_conventions = _namespaces
+    local_regex = ('^0000-000(1-[5-9]|2-[0-9]|3-[0-4])'
+                   '[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
     canonical_regex = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
                        '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
 

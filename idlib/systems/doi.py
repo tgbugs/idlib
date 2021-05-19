@@ -26,6 +26,7 @@ class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a s
     _namespaces = _DoiPrefixes
     _local_conventions = _namespaces
     _id_class = str  # eventually we have to drop down to something
+    local_regex = '^10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
     canonical_regex = '^https:\/\/doi.org/10\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
 
     def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):

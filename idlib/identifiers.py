@@ -53,6 +53,7 @@ class Identifier(idlib.Stream):  # TODO decide if str should be base ...
     # same with local:?:1, local:?:2, local:?:3, local:?:4
 
     _id_class = str
+    local_regex = None  # an unqualified, likely non-unique regex for the system local identifier
     canonical_regex = None  # but really '.+'
     #@staticmethod
     #def normalize(identifier):
