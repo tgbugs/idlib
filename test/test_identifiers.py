@@ -1,129 +1,14 @@
 import os
-import pickle
-import hashlib
 import unittest
 import pytest
-import requests
-from joblib import Parallel, delayed
 import idlib
+from idlib.streams import HelpTestStreams
 
 skipif_ci = pytest.mark.skipif('CI' in os.environ, reason='API key required')
 
 
-def lol(d):
-    """ HEY KIDS WATCH THIS """
-    Parallel(n_jobs=2)(delayed(lambda d: d)(d) for d in (d,))
-
-
-class HelperStream:
-    stream = None
-    ids = tuple()
-    ids_bad = tuple()
-
-    def test_stream_sections(self):
-        # TODO run each on of the properties/methods in
-        # a separate loop?
-        cypher = hashlib.blake2b
-        bads = []
-        for i in self.ids:
-            d = self.stream(i)
-            d.identifier
-            if d.identifier and hasattr(d.identifier, 'prefix'):
-                print(d.identifier)
-                print(d.identifier.prefix)
-                print(d.identifier.suffix)
-                if d.identifier.prefix is None or d.identifier.suffix is None:
-                    bads.append(d.identifier.__dict__)
-
-            try:
-                d.identifier_bound_metadata
-                d.identifier_bound_version_metadata
-
-                d.checksum(cypher)  # data or metadata? indication that there should be multiple probably
-                d.dereference()  # XXX induces infinite recursion
-                d.headers()
-                d.metadata()
-
-                if not isinstance(d, idlib.HelperNoData):
-                    d.data()
-
-                d.progenitor()  # or is it d.data.progenitor?
-
-                # test pickling
-                hrm = pickle.dumps(d)
-                tv = pickle.loads(hrm)
-                if tv.checksum(cypher) != d.checksum(cypher):
-                    bads.append((tv, d))
-
-            except requests.exceptions.ConnectionError as e:
-                pytest.skip('Internet done goofed')
-
-            # test joblib
-            lol(d)
-
-        assert not bads, bads
-
-    def test_malformed(self):
-        bads = []
-        for i in self.ids_bad:
-            try:
-                d = self.stream(i)
-                d.append(bads)
-            except:
-                pass
-
-        assert not bads, bads
-
-    def test_hash_eq_id(self):
-        hrm = self.ids[0]
-        i1 = self.stream(hrm)
-        i2 = self.stream(hrm)
-
-        # what did we decide about how to handle this?
-        # stream is the same but the state might be different?
-        # what are the design tradeoffs here? it means that the
-        # stream cannot be used as a dictionary key, which is
-        # extremely annoying, but would still have A is B => False
-
-        # we decided (as of now) that all streams hash to their
-        # class plus the string representation of their identifier
-        # and that equality compares class and identifier equality
-
-        # hash testing
-        assert len({i1, i2}) == 1
-        assert len({i1.identifier, i2.identifier}) == 1
-
-        assert len({i1, i1.identifier}) == 2
-        assert len({i1, i2.identifier}) == 2
-        assert len({i1.identifier, i2}) == 2
-
-        # equality testing
-        assert i1 == i2
-        assert i1.identifier == i2.identifier
-
-        assert i1 != i1.identifier
-        assert i1 != i2.identifier
-        assert i1.identifier != i2
-
-        # python object identity testing (confusingly)
-        assert i1 is not i2
-        assert i1.identifier is not i2.identifier
-
-        assert i1 is not i1.identifier
-        assert i1 is not i2.identifier
-        assert i1.identifier is not i2
-
-    def test_asDict(self):
-        for id in self.ids:
-            s = self.stream(id)
-            try:
-                d = s.asDict()
-            except requests.exceptions.ConnectionError as e:
-                pytest.skip('Internet done goofed')
-
-
 @pytest.mark.skip('Not ready.')
-class TestStreamUri(HelperStream, unittest.TestCase):
+class TestStreamUri(HelpTestStreams, unittest.TestCase):
     stream = idlib.StreamUri
     ids = [
         'https://github.com',
@@ -135,7 +20,7 @@ class TestStreamUri(HelperStream, unittest.TestCase):
 
 
 @pytest.mark.skip('Not ready.')
-class TestArk(HelperStream, unittest.TestCase):
+class TestArk(HelpTestStreams, unittest.TestCase):
     stream = idlib.Ark
     ids = [
         'https://doi.org/10.13003/5jchdy',
@@ -143,7 +28,7 @@ class TestArk(HelperStream, unittest.TestCase):
     ids_bad = ['lol not an identifier']
 
 
-class TestDoi(HelperStream, unittest.TestCase):
+class TestDoi(HelpTestStreams, unittest.TestCase):
     stream = idlib.Doi
     ids = [
         'https://doi.org/10.13003/5jchdy',
@@ -163,7 +48,7 @@ class TestDoi(HelperStream, unittest.TestCase):
         # but how to see if there is something new?
 
 
-class TestOrcid(HelperStream, unittest.TestCase):
+class TestOrcid(HelpTestStreams, unittest.TestCase):
     stream = idlib.Orcid
     ids = [
         'https://orcid.org/0000-0002-1825-0097',
@@ -189,7 +74,7 @@ class TestOrcid(HelperStream, unittest.TestCase):
         assert str(o) != str(nt), 'string representation of streams should not match id ???'
 
 
-class TestRor(HelperStream, unittest.TestCase):
+class TestRor(HelpTestStreams, unittest.TestCase):
     stream = idlib.Ror
     ids = [
         'https://ror.org/0168r3w48',
@@ -226,7 +111,7 @@ class TestRor(HelperStream, unittest.TestCase):
         assert str(r) != str(nt), 'string representation of streams should not match id'
 
 
-class TestRrid(HelperStream, unittest.TestCase):
+class TestRrid(HelpTestStreams, unittest.TestCase):
     stream = idlib.Rrid
     ids = [
         'RRID:AB_1234567',
@@ -240,7 +125,7 @@ class TestRrid(HelperStream, unittest.TestCase):
 
 
 @skipif_ci
-class TestPio(HelperStream, unittest.TestCase):
+class TestPio(HelpTestStreams, unittest.TestCase):
     stream = idlib.Pio
     ids = [
         'https://www.protocols.io/view/reuse-pc3diyn',
@@ -291,7 +176,7 @@ class TestPio(HelperStream, unittest.TestCase):
 
 
 @skipif_ci
-class TestPioUser(HelperStream, unittest.TestCase):
+class TestPioUser(HelpTestStreams, unittest.TestCase):
     stream = idlib.PioUser
     ids = [
         'pio.user:tom-gillespie',

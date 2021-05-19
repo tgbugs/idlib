@@ -412,6 +412,138 @@ class HelperNoData:  # FIXME should be
         return self.dereference_chain(), self._prgn_metadata  # FIXME assumptions about uri ...
 
 
+class HelpTestStreams:
+    stream = None
+    ids = tuple()
+    ids_bad = tuple()
+
+    @staticmethod
+    def setUpClass():
+        if not hasattr(HelpTestStreams, '_requests'):
+            import requests
+            HelpTestStreams._requests = requests
+            from joblib import Parallel, delayed
+            HelpTestStreams._Parallel = Parallel
+            HelpTestStreams._delayed = delayed
+            import hashlib
+            HelpTestStreams._hashlib = hashlib
+            import copy
+            HelpTestStreams._copy = copy
+            import pickle
+            HelpTestStreams._pickle = pickle
+
+    @classmethod
+    def _lol_joblib(cls, d):
+        """ HEY KIDS WATCH THIS """
+        cls._Parallel(n_jobs=2)(cls._delayed(lambda d: d)(d) for d in (d,))
+
+    def test_stream_sections(self):
+        # TODO run each on of the properties/methods in
+        # a separate loop?
+        cypher = self._hashlib.blake2b
+        bads = []
+        for i in self.ids:
+            d = self.stream(i)
+            d.identifier
+            if d.identifier and hasattr(d.identifier, 'prefix'):
+                print(d.identifier)
+                print(d.identifier.prefix)
+                print(d.identifier.suffix)
+                if d.identifier.prefix is None or d.identifier.suffix is None:
+                    bads.append(d.identifier.__dict__)
+
+            try:
+                d.identifier_bound_metadata
+                d.identifier_bound_version_metadata
+
+                d.checksum(cypher)  # data or metadata? indication that there should be multiple probably
+                d.dereference()  # XXX induces infinite recursion
+                d.headers()
+                d.metadata()
+
+                if not isinstance(d, HelperNoData):
+                    d.data()
+
+                d.progenitor()  # or is it d.data.progenitor?
+
+                # test pickling
+                hrm = self._pickle.dumps(d)
+                tv = self._pickle.loads(hrm)
+                if tv.checksum(cypher) != d.checksum(cypher):
+                    bads.append((tv, d))
+
+                # test copying
+                tv = self._copy.deepcopy(d)
+                if tv.checksum(cypher) != d.checksum(cypher):
+                    bads.append((tv, d))
+
+            except self._requests.exceptions.ConnectionError as e:
+                pytest.skip('Internet done goofed')
+
+            # test joblib
+            self._lol_joblib(d)
+
+        assert not bads, bads
+
+    def test_malformed(self):
+        bads = []
+        for i in self.ids_bad:
+            try:
+                d = self.stream(i)
+                d.append(bads)
+            except:
+                pass
+
+        assert not bads, bads
+
+    def test_hash_eq_id(self):
+        hrm = self.ids[0]
+        i1 = self.stream(hrm)
+        i2 = self.stream(hrm)
+
+        # what did we decide about how to handle this?
+        # stream is the same but the state might be different?
+        # what are the design tradeoffs here? it means that the
+        # stream cannot be used as a dictionary key, which is
+        # extremely annoying, but would still have A is B => False
+
+        # we decided (as of now) that all streams hash to their
+        # class plus the string representation of their identifier
+        # and that equality compares class and identifier equality
+
+        # hash testing
+        assert len({i1, i2}) == 1
+        assert len({i1.identifier, i2.identifier}) == 1
+
+        assert len({i1, i1.identifier}) == 2
+        assert len({i1, i2.identifier}) == 2
+        assert len({i1.identifier, i2}) == 2
+
+        # equality testing
+        assert i1 == i2
+        assert i1.identifier == i2.identifier
+
+        assert i1 != i1.identifier
+        assert i1 != i2.identifier
+        assert i1.identifier != i2
+
+        # python object identity testing (confusingly)
+        assert i1 is not i2
+        assert i1.identifier is not i2.identifier
+
+        assert i1 is not i1.identifier
+        assert i1 is not i2.identifier
+        assert i1.identifier is not i2
+
+    def test_asDict(self):
+        for id in self.ids:
+            s = self.stream(id)
+            try:
+                d = s.asDict()
+            except self._requests.exceptions.ConnectionError as e:
+                pytest.skip('Internet done goofed')
+
+
 class StreamUri(Stream):
     """ Implementation of basic methods for URI streams.
 
