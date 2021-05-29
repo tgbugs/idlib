@@ -273,9 +273,13 @@ def setup(cls, creds_file=None):
             raise TypeError('creds_file is a required argument'
                             ' unless you have it in secrets') from e
 
-    _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
-    cls._pio_header = oa.utils.QuietDict(
-        {'Authorization': 'Bearer ' + _pio_creds.token})
+    try:
+        _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
+        cls._pio_header = oa.utils.QuietDict(
+            {'Authorization': 'Bearer ' + _pio_creds.token})
+    except exc.ConfigurationError as e:
+        log.warning(e)
+        cls._pio_header = None
 
 
 class Pio(formats.Rdf, idlib.Stream):
@@ -456,8 +460,15 @@ class Pio(formats.Rdf, idlib.Stream):
                     msg = f'unhandled pio status code {sc}\n' + message
                     raise NotImplementedError(msg)
             else:
-                self._status_code = blob['status_code']
-                self._data = blob['protocol']
+                if 'status_code' in blob and 'protocol' in blob:
+                    self._status_code = blob['status_code']
+                    self._data = blob['protocol']
+                elif 'id' in blob:  # not via the api
+                    self._status_code = 200
+                    self._data = blob
+                else:
+                    log.error(blob)
+                    raise exc.RemoteError('no idea what is going on here')
 
             self._data_in_error = False
 
@@ -470,7 +481,21 @@ class Pio(formats.Rdf, idlib.Stream):
 
         # TODO progenitors
         log.debug('going to network for protocols')
-        resp = self._requests.get(apiuri, headers=self._pio_header)
+        if self._pio_header is None:
+            # FIXME TODO private ...
+            if self.identifier == self.identifier.uri_api_int:
+                prog = self.progenitor(type='id-converted-from')
+                # XXX FIXME this will surely fail
+                slug = prog.slug
+            else:
+                slug = self.slug
+
+            hack = self._id_class(
+                prefix='pio.view',
+                suffix=slug).asStr() + '.json'
+            resp = self._requests.get(hack)
+        else:
+            resp = self._requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
         self._progenitors['stream-http'] = resp
         if resp.ok:

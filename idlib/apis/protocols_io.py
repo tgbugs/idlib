@@ -95,9 +95,12 @@ def get_protocols_io_auth(creds_file,
                 creds.refresh(Request())
             except Exception as e:
                 raise exc.RemoteError('protocols.io refresh error') from e
-        else:
+        elif creds_file is not None:
             flow = InstalledAppFlowConsole.from_client_secrets_file(creds_file.as_posix(), SCOPES)
             creds = flow.run_console_only()
+        else:
+            msg = 'missing config entry for creds-file'
+            raise exc.ConfigurationError(msg)
 
         with open(store_file, 'wb') as f:
             pickle.dump(creds, f)

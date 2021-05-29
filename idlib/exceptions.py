@@ -4,6 +4,14 @@ class IdlibError(Exception):
     """ base class for idlib errors """
 
 
+class LocalError(IdlibError):
+    """ Something went wrong locally and we can do something about it. """
+
+
+class ConfigurationError(LocalError):
+    """ Something went wrong with local configuration. """
+
+
 class CouldNotReachError(IdlibError):
     """ Could not reach a remote. """
     # FIXME vs UnreachableError, unreachable seems like
