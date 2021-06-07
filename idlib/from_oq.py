@@ -472,28 +472,74 @@ class Pio(formats.Rdf, idlib.Stream):
 
             self._data_in_error = False
 
+            if self._pio_header is None and not self.identifier.is_int():
+                # XXX out of band load the uri api int value
+                _uai = self.uri_api_int.identifier.uri_api
+                self._hack_hash_value = blob
+                self._get_data(_uai)
+
         return self._data
+
+    @staticmethod
+    def _get_user_jwt(resp):
+        """ an aweful way to get this that surely will break """
+        text = resp.text
+        before, after = text.split('USER_JWT')
+        eq, user_jwt, rest = after.split('"', 2)
+        return user_jwt
 
     @cache(auth.get_path('cache-path') / 'protocol_json', create=True, return_path=True)
     def _get_data(self, apiuri):
         """ use apiuri as the identifier since it is distinct
             from other views of the protocol e.g. uri_human etc. """
 
+        if hasattr(self, '_hack_hash_value') and self._hack_hash_value is not None:
+            # make it possible to cache an arbitrary value without
+            # actually retrieving it
+            v = self._hack_hash_value
+            self._hack_hash_value = None
+            return v
+
         # TODO progenitors
         log.debug('going to network for protocols')
         if self._pio_header is None:
             # FIXME TODO private ...
-            if self.identifier == self.identifier.uri_api_int:
-                prog = self.progenitor(type='id-converted-from')
-                # XXX FIXME this will surely fail
-                slug = prog.slug
+            if self.identifier.is_private():
+                resp1 = self._requests.get(self.asUri())
+                user_jwt = self._get_user_jwt(resp1)
+                headers = {'Authorization': f'Bearer {user_jwt}'}
+                gau = apiuri.replace('www', 'go').replace('v3', 'v1')
+                fields = '?fields[]=' + '&fields[]='.join(
+                    ( # FIXME TODO need to match this list up to other things we need
+                        'doi',
+                        'protocol_name',
+                        'protocol_name_html',
+                        'creator',
+                        'authors',
+                        'description',
+                        'link',
+                        'created_on',
+                        'last_modified',
+                        'public',
+                        'doi_status',
+                        'materials_text',
+                        'version',
+                        'keywords',
+                     )
+                )
+                resp = self._requests.get(gau + fields, headers=headers)
             else:
-                slug = self.slug
+                if self.identifier == self.identifier.uri_api_int:
+                    prog = self.progenitor(type='id-converted-from')
+                    # XXX FIXME this will surely fail
+                    slug = prog.slug
+                else:
+                    slug = self.slug
 
-            hack = self._id_class(
-                prefix='pio.view',
-                suffix=slug).asStr() + '.json'
-            resp = self._requests.get(hack)
+                hack = self._id_class(
+                    prefix='pio.view',
+                    suffix=slug).asStr() + '.json'
+                resp = self._requests.get(hack)
         else:
             resp = self._requests.get(apiuri, headers=self._pio_header)
         #log.info(str(resp.request.headers))
