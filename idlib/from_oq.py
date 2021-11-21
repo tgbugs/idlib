@@ -84,12 +84,13 @@ class _PioPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
     _trie = {}
 
 
-_PioPrefixes({'pio.view': 'https://www.protocols.io/view/',
+_PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!! FINALLY
               'pio.edit': 'https://www.protocols.io/edit/',  # sigh
               'pio.run': 'https://www.protocols.io/run/',  # sigh
               'pio.private': 'https://www.protocols.io/private/',
               'pio.fileman': 'https://www.protocols.io/file-manager/',
               'pio.api': 'https://www.protocols.io/api/v3/protocols/',
+              'pio.api1': 'https://www.protocols.io/api/v1/protocols/',
 })
 
 
@@ -139,6 +140,10 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     @property
     def uri_api(self):
         return self.__class__(prefix='pio.api', suffix=self.slug)
+
+    @property
+    def uri_api1(self):
+        return self.__class__(prefix='pio.api1', suffix=self.slug)
 
     def normalize(self):
         return self
@@ -417,6 +422,66 @@ class Pio(formats.Rdf, idlib.Stream):
         pid._progenitors['id-converted-from'] = self
         return pid
 
+    # XXXXX WARNING IF YOU CHANGE THIS CLEAR THE CACHE OF v1 urls!
+    fields = '?fields[]=' + '&fields[]='.join(
+        ( # FIXME TODO need to match this list up to other things we need
+            'doi',
+            'protocol_name',
+            'protocol_name_html',
+            'creator',
+            'authors',
+            'description',
+            'link',
+            'created_on',
+            'last_modified',
+            'public',
+            'doi_status',
+            'materials',
+            #'materials_text',
+            'version',
+            'keywords',
+            'steps',
+            'child_steps',
+            )
+    )
+
+    def _get_direct(self, apiuri):#, cache=True):
+        if not isinstance(self._progenitors, dict):
+            # XXX careful about the contents going stale
+            self._progenitors = {}
+
+        resp1 = self._requests.get(self.asUri())
+        user_jwt = self._get_user_jwt(resp1)
+        headers = {'Authorization': f'Bearer {user_jwt}'}
+        gau = (apiuri
+            #.replace('www', 'go')
+            .replace('v3', 'v1'))
+        #if cache:
+            #oph = self._pio_header
+            #try:
+                #self._pio_header = headers
+                #return self._get_data(gau + self.fields)
+            #finally:
+                #self._pio_header = oph
+        #else:
+        resp = self._requests.get(gau + self.fields, headers=headers)
+        return resp
+
+
+    def _data_direct(self):
+        return self.uri_human._get_direct(self.identifier.uri_api)
+
+    def data1(self, fail_ok=False):
+        # FIXME needs robobrowser or similar to function without issues
+        # because there is no oauth for it
+        # get data from the api/v1 endpoint which is is needed for unmangled steps
+        resp = self._data_direct()
+        j = resp.json()
+        if 'protocol' not in j:  # FIXME SIGH
+            return None
+        data = j['protocol']
+        return data
+
     def data(self, fail_ok=False):
         if not hasattr(self, '_data'):
             self._data_in_error = True
@@ -425,6 +490,14 @@ class Pio(formats.Rdf, idlib.Stream):
                 self._progenitors = {}
 
             apiuri = self.identifier.uri_api
+            # FIXME XXX the v3 api is completely busted and is missing a ton of
+            # information, for example it contains no information about substeps
+            # they seemingly appear at random without indication on the ui
+            # FIXME the better way is to use
+            # /v1/protocols/{private-token} which gets us what we need more easily
+            # however this is not trivial to retrive
+            # the /v3/protocols/{id} endpoint returns bad/mangled data and we need
+            # the /v1/ data to be able to actually render to org
             blob, path = self._get_data(apiuri)
             if 'stream-http' not in self._progenitors:
                 self._progenitors['path'] = path
@@ -480,6 +553,507 @@ class Pio(formats.Rdf, idlib.Stream):
 
         return self._data
 
+    def asOrg(self):
+        from bs4 import BeautifulSoup
+
+        def ct(text):
+            return (text
+                    .replace('\xa0', ' ')  # non breaking space, our old friend
+                    .replace('\u202F', ' ')  # narrow no break space aka '\xe2\x80\xaf'
+                    )
+
+        sections = {}
+        def hac(soup, cls):
+            return soup.has_attr('class') and cls in soup.attrs['class']
+        def hasty(soup, sty):
+            return soup.has_attr('style') and sty in soup.attrs['style']
+
+        def convert(soup, ind):
+            if isinstance(soup, str):
+                return soup.replace('\n', f'\n{ind}')
+
+            tag = soup.name
+            attrs = soup.attrs
+
+            if tag == '[document]':
+                return '\n'.join(convert(c, ind) for c in soup.children)
+            if tag == 'html':
+                return '\n'.join(convert(c, ind) for c in soup.children)
+            if tag == 'head':
+                return ''  # html5lib adds this section
+                # raise NotImplementedError(f'well this is awkward\n{soup}')
+            if tag == 'body':
+                return '\n'.join(convert(c, ind) for c in soup.children)
+
+            if tag == 'div' and hac(soup, 'text-blocks'):
+                return '\n'.join(convert(c, ind) for c in soup.children)
+
+            if (tag == 'div' and hac(soup, 'text-block')):
+                return ''.join(convert(c, ind) for c in soup.children)
+
+            if tag == 'div':
+                # XXX watch out here may skip important div info
+                return ''.join(convert(c, ind) for c in soup.children)
+
+            if tag == 'img':
+                # FIXME TODO need correct typesetting for these
+                return f'{ind}[[imgl:{soup.get("src")}]]'
+                #return f'\n{ind}#+attr_html: :style float: center; width: 50%;\n{ind}[[imgl:{soup.get("src")}]]'
+
+            if tag == 'br':
+                #return ' '
+                return '\n'
+
+            if tag == 'a':
+                text = soup.text.strip()
+                href = soup.get("href")
+                if text:
+                    return f'[[{href}][{soup.text}]]'
+                elif href == '#':
+                   return '{{{empty-link}}} '
+                else:
+                    breakpoint()
+                    return f'[[{href}]]'
+
+            if tag == 'ol':
+                #bul = f'{ind}0. '
+                #sep = f'\n{bul}'
+                return ''.join(
+                    f'\n{ind}{i + 1}. ' + convert(c, ind)
+                    for i, c in enumerate(soup.children))
+
+            if tag == 'ul':
+                bul = f'{ind}- '
+                sep = f'\n{bul}'
+                return '- ' + sep.join(convert(c, ind) for c in soup.children)
+
+            if tag == 'li':
+                return ''.join(convert(c, ind) for c in soup.children)
+
+            if tag == 'table':
+                return '\n'.join(convert(c, ind) for c in soup.children)
+            if tag == 'tbody':
+                return '\n'.join(convert(c, ind) for c in soup.children)
+            if tag == 'tr':
+                return '| ' + ' | '.join(convert(c, ind) for c in soup.children)
+            if tag == 'td':
+                return ''.join(convert(c, ind) for c in soup.children).replace('\n', ' ')
+
+            if tag == 'sup':
+                text = ''.join(convert(c, ind) for c in soup.children)
+                return '^{' + text + '}'  # FIXME this needs to be preceeded by something else
+
+            if tag == 'style':
+                return ''
+
+            if tag == 'b':
+                text = ''.join(convert(c, ind) for c in soup.children)
+                ts = text.strip()
+                if ts:
+                    return '*' + ts + '*'
+                else:
+                    return ''
+
+            if tag == 'span':
+                childs = list(soup.children)
+                text = ''.join(convert(c, ind) for c in childs)
+                # FIXME combo
+                mu = ''
+                if hasty(soup, 'font-weight:bold'):
+                    mu += '*'
+                if hasty(soup, 'font-style:italic'):
+                    mu += '/'
+                if mu:
+                    ts = text.strip()
+                    if ts:
+                        # FIXME the bane of trailing whitespace
+                        return mu + ts + mu[::-1] + ' '
+                    else:
+                        return ' '
+
+                return text
+
+            if tag in ('o:p', 'pre', 'code'):
+                # FIXME ignoring pre and code for now because what the heck are they doing
+                # in the free text of protocols ?!
+                # I have no idea what the heck this o:p thing is?
+                # TODO skip tags group for other apparently empty tags?
+                text = ''.join(convert(c, ind) for c in soup.children)
+                if tag in ('pre', 'code'):
+                    return f'#+html: <{tag}>\n{text}\n#+html: </{tag}>'
+                else:
+                    return text
+
+            sigh = 'activation', 'simulation'  # FIXME hardcoded workaround
+            # protocols.io does not properly escape/render angle brackets in text
+            if tag in sigh:
+                text = soup.text.replace('\n', f'\n{ind}')
+                return ('\n' + ind +
+                        '# WARNING THIS TEXT IS MANGLED DUE TO BAD OUTPUT FROM UPSTREAM\n' +
+                        f'{ind}#+begin_mangled :tag {tag}\n{ind}{text}\n{ind}#+end_mangled')
+
+            breakpoint()
+            raise NotImplementedError((tag, soup))
+
+        def block(type, source, ind):
+            s = BeautifulSoup(source['body'], 'html5lib')
+            # XXX protocols.io v3 produces malformed html sigh
+            _text = convert(s, ind)
+            text = _text.replace('\n', f'\n{ind}')  # FIXME see why we still need this? no?
+            return f'{ind}#+begin_{type}\n{ind}{text}\n{ind}#+end_{type}'
+
+        stitle = None
+        def format_comp(comp, n, ind='  '):
+            nonlocal stitle  # sigh
+            title = comp['title']
+            type_id = comp['type_id']
+            source = comp['source']
+            order_id = comp['order_id']
+
+            if type_id == 1:  # description
+                desc = source['description']
+                s = BeautifulSoup(desc, 'html5lib')
+                html = ('\n#+begin_export html\n' +
+                        desc.replace('<', '\n<') +
+                        '\n#+end_export')
+                if order_id == 1:
+                    tbs = s.find_all('div', 'text-block')
+                    converted = [convert(b, ind) for b in tbs]
+                    if not converted:
+                        log.warning(f'empty?? {comp}')
+                    if not sections[stitle]:
+                        sections[stitle] = True
+                        counter_set = f'[@{n}] '
+                    else:
+                        counter_set = ''
+
+                    return f'{n}. {counter_set}' + '\n  '.join(converted)  # + html
+                else:
+                    return convert(s, ind)
+
+                #ul = s.find_all('ul')
+                #if ul:
+                    #tbs = s.find_all('div', 'text-block')
+                    #[b.find_all('li') if  for b in tbs]
+                    #breakpoint()
+                #return '0. ' + ct(s.text) + html
+
+            elif type_id == 3:  # amount
+                inp = source['title']
+                unit = source['unit']
+                amount = source['amount']
+                return ind + f'{amount} {unit} {inp}'  # FIXME embed
+
+            elif type_id == 4:  # duration
+                duration = source['duration']
+                unit = 'seconds'  # XXX I assume this is in seconds? no unit given
+                return ind + f'{duration} {unit}'  # FIXME embed
+
+            elif type_id == 6:  # section
+                stitle = source['title']
+                if stitle not in sections:
+                    sections[stitle] = False
+                    return f'** {stitle}'
+                else:
+                    return ''
+
+            elif type_id == 7:  # external link
+                breakpoint()
+                raise NotImplementedError(comp)
+            elif type_id == 8:  # software package
+                name = source['name']
+                dev = source['developer']
+                dev = dev if dev else ''
+                repo = source['repository']
+                repo = repo if repo else ''
+                return ind + '{{{software(' + ','.join((name, dev, repo)) + ')}}}'
+            elif type_id == 9:  # dataset package
+                breakpoint()
+                raise NotImplementedError(comp)
+
+            elif type_id == 13:  # comment
+                #s = BeautifulSoup(source['body'], 'html5lib')
+                #text = convert(s.find_all('div', {'class': 'text-blocks'})[0])
+                breakpoint()
+                raise NotImplementedError(comp)
+                text = None # .replace('\n', f'\n{ind}')
+                type = 'comment'  # FIXME TODO block type for typesetting
+                return f'{ind}#+begin_{type}\n{ind}{text}\n{ind}#+end_{type}'  # FIXME indent
+
+            elif type_id == 15:  # command package
+                name = source['name']
+                cname = source['command_name']
+                cmd = source['command']
+                os_name = source['os_name']
+                os_version = source['os_version']
+                osl = {'MATLAB': 'octave',}
+                lang = osl[os_name] if os_name in osl else os_name
+
+                out = (f'{ind}#+caption: {cmd}\n'
+                       f'{ind}#+begin_src {lang} :runtime {os_name} :runtime-version {os_version}\n'
+                       f'{ind}{name}\n{ind}#+end_src\n')
+                _jd = json.dumps(source, indent=2)
+                jd = _jd.replace('\n', f'\n{ind}')
+                debug = f'\n{ind}#+begin_src json\n{jd}\n{ind}#+end_src\n'
+                return out  # + debug
+
+                breakpoint()
+                raise NotImplementedError(comp)
+
+            elif type_id == 17:  # expected result
+                return block('expected_result', source, ind)
+
+            elif type_id == 18:  # protocol
+                # TODO account for these to see if there are
+                # ones that are referenced that we don't already have ...
+                # TODO on the site these are embedded directly into
+                # the protocol, the issue of course is that I haven't
+                # implemented intentation level yet, and transclusion
+                # probably makes more sense anyway, also it is quite
+                # a bit eaiser to understand what is going on when a
+                # repeated protocol is not materialized into the page
+                # it also reduces duplicate annotation
+                _pid = self.identifier.__class__(
+                    prefix='pio.api', suffix=str(source['id']))
+                return ind + f'[[{_pid.asStr()}][{source["title"]}]]'
+
+            elif type_id == 19:  # safety
+                s = BeautifulSoup(source['body'], 'html5lib')
+                _text = convert(s, ind)
+                text = _text.replace('\n', f'\n{ind}').strip()  # FIXME see why we still need this?
+                type = 'safety'  # FIXME TODO block type for typesetting
+                return f'{ind}#+begin_{type}\n{ind}{text}\n{ind}#+end_{type}'
+
+            elif type_id == 20:  # reagent
+                name = source['name'].strip().replace('\n', ' ').replace(',','\\,')
+                url = source['url']
+                sku = source['sku']  # sometimes rrid lurks here
+                rrid = source['rrid']
+                vendor = source['vendor']
+                if 'RRID:' in sku:
+                    rrid = sku
+                if rrid:
+                    # may pop vendor info out elsewhere into materials or something?
+                    return ind + '{{{' + f'rrid({name},{rrid})' + '}}}'
+                    #return f'[[{url}][{name} ({rrid})]]'  # FIXME proper citation etc.
+
+                vname = vendor['name']  # TODO put in materials section I think
+                #vurl = vendor['url']
+
+                # FIXME macro need to escape ,
+                if sku and url:
+                    return ind + '{{{reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
+                if url:
+                    return ind + '{{{reagent_url(' + name + ',' + url + ')}}}'
+                if sku:
+                    return ind + '{{{reagent_sku(' + name + ',' + sku + ')}}}'
+
+                if vname == 'Contributed by users':
+                    return ind + '{{{reagent(' + name + ')}}}'  # TODO markup
+
+                return ind + '{{{reagentv(' + ','.join((name, vname)) + ')}}}'
+
+            elif type_id == 21:  # step cases
+                breakpoint()
+                raise NotImplementedError(comp)
+
+            elif type_id == 22:  # goto previous step (ouch)
+                breakpoint()
+                raise NotImplementedError(comp)
+
+            elif type_id == 23:  # file
+                url = source['source']
+                name = source['original_name']
+                return f'{ind}[[{url}][{name}]]'  # TODO render file type somehow?
+
+            elif type_id == 24:  # temperature
+                unit = source['unit']
+                value = source['temperature']
+                if unit == 'Room temperature':
+                    return ind + 'room temperature'
+                elif unit == 'On ice':
+                    # XXX FIXME on ice and ice cold are NOT always the same thing
+                    # ice code has a fuzzy quantity associated with it, but
+                    # on ice can mean something quite different in some circumstances
+                    return ind + 'ice cold'  # FIXME embed
+                elif unit == '°C':
+                    return ind + f'{value} {unit}'  # FIXME embed
+
+            elif type_id == 25:  # concentration
+                _unit = source['unit']
+                if _unit == 'Molarity (M)':
+                    unit = 'mol/l'
+                elif _unit == 'Micromolar (µM)':
+                    unit = 'µmol/l'
+                elif _unit == 'Nanomolar (nM)':
+                    unit = 'nmol/l'
+                elif _unit == 'Mass Percent':
+                    unit = '% mass'
+                elif _unit == 'Volume Percent':
+                    unit = '% volume'
+                elif _unit == 'Mass/Volume Percent':
+                    # what in the name of all unholy dimensionalities is this !?!?
+                    unit = '% mass/volume'
+                else:
+                    log.warning(f'unhandled unit {_unit}')
+                    unit = _unit
+
+                value = source['concentration']
+                return ind + f'{value} {unit}'  # FIXME embedding :/
+
+            elif type_id == 26:  # notes
+                s = BeautifulSoup(source['body'], 'html5lib')
+                _text = convert(s.find_all('div', {'class': 'text-blocks'})[0], ind)
+                text = _text.replace('\n', f'\n{ind}')
+                type = 'note'  # FIXME TODO block type for typesetting
+                return f'{ind}#+begin_{type}\n{ind}{text}\n{ind}#+end_{type}'
+
+            elif type_id == 28:  # equipment
+                brand = source['brand']
+                _sku = source['sku']
+                sku = '' if _sku == 'N/A' or not _sku else _sku + ' '
+                name = source['name']
+                # TODO markup somehow maybe ?
+                return ind + f'{name} ({sku}{brand})'
+
+                breakpoint()
+                raise NotImplementedError(comp)
+
+            elif type_id == 30:  # centrifuge
+                # TODO apparently there is a units field that can
+                # be pulled back from a public protocol that is needed
+                # to translate this section (WAT)
+                if not hasattr(self.__class__, '_pio_units'):
+                    # FIXME a bit more systematic approach perhaps
+                    resp = self._requests.get(
+                        'https://www.protocols.io/api/v3/units',
+                        headers=self._pio_header)
+                    j = resp.json()
+                    self.__class__._pio_units = j['units']
+
+                value = source['centrifuge']
+                unit_id = source['unit']
+                unit = 'times-earth-gravity' if unit_id == 34 else '???'
+
+                # why the heck did they create yet another thing that
+                # has an embedded temperature !?
+                temp_unit_id = source['temperatureUnit']
+                temp_unit = 'K' if temp_unit_id == 10 else '???'
+                # there is no good way to do this ... 1000 m/s2
+                return ind + f'{value} {unit}'
+
+            breakpoint()
+            raise NotImplementedError(comp)
+
+        def format_step(step, n):
+            comps = []
+            for c in sorted(step['components'], # reverse=True,
+                            key=lambda c: c['order_id']):
+                fc = format_comp(c, n)
+                comps.append(fc)
+
+            # FIXME big problems here
+            return '\n'.join(comps)
+
+        def format_mats(mats):
+            # TODO molecular weight?
+            hs = 'name', 'sku', 'vendor name', 'chemical name', 'cas number', 'rrid', 'url'
+            table = '\n| ' + ' | '.join(hs) + '\n|-'
+            for m in mats:
+                vs = (m['name'], m['sku'], m['vendor']['name'],
+                      m['linfor'],  # FIXME is this really chemical name?
+                      m['cas_number'], m['rrid'], m['url'])
+                row = [v.strip() if isinstance(v, str) else '' for v in vs]
+                table += '\n| ' + ' | '.join(row)
+
+            return table
+
+            #return ('\n#+begin_src json\n' +
+                    #json.dumps(mats, indent=2) +
+                    #'\n#+end_src')
+            #for mat in mats:
+
+        import htmlfn as hfn
+        data = self.data()
+        # FIXME may encounter anchoring issuse if we do this
+        # will likely need to adjust accordingly
+        lrc = f'<link rel="canonical" href="{self.uri_api_int.asStr()}">'
+        doi = self.doi
+        if doi:
+            metas = (
+                dict(name='dc.identifier', content=doi.asStr()),
+                dict(name='DOI', content=doi.asStr()),
+                    )
+        else:
+            metas = tuple()
+
+        metas += (
+            dict(name='og.url', content=self.uri_human.asStr()),
+        )
+
+        helper = [s for s in data['steps'] # debug
+                  if [c for c in s['components'] if c['type_id'] in (24, 4, 3)]]
+
+        _war = data['warning']
+        _waf = convert(BeautifulSoup(_war, 'html5lib'), '').strip() if _war else ''
+        warnings = ('\n* Warnings\n' + _waf if _waf else '')
+
+        _gls = data['guidelines']
+        _glf = convert(BeautifulSoup(_gls, 'html5lib'), '').strip() if _gls else ''
+        guidelines = ('\n* Guidelines\n' + _glf if _glf else '')
+
+        _mat = data['materials']
+        # TODO add additional materials accumulated from inline content
+        # no idea why pio doesn't do that automatically itself ...
+        materials = ('\n* Materials\n' + format_mats(_mat).strip()
+                     if _mat else '')
+
+        body = (
+            f'\n\n[[{self.uri_human.asStr()}][Original on protocols.io]]\n' +
+            # guidelines warnings materials metadata
+            warnings +
+            guidelines +
+            materials +
+            '\n* Steps\n' +
+            '\n'.join(format_step(s, i + 1) for i, s in enumerate(data['steps'])))
+
+        title = data['title']
+
+        options = (
+            '\n#+options: ^:nil'
+            '\n'
+        )
+
+        # TODO probably want a span macro
+        macros = (
+            '\n#+macro: empty-link *ERROR-UPSTREAM* '
+            '\n#+macro: rrid =$1 ($2)='
+            '\n#+macro: reagent_skurl =$1 ($2)= @@comment: $3@@'
+            '\n#+macro: reagent_sku =$1 ($2)='
+            '\n#+macro: reagent_url =$1= @@comment: $2@@'
+            '\n#+macro: reagentv =$1 ($2)='
+            '\n#+macro: reagent =$1='
+            '\n#+macro: software [[$3][$1]] @@comment: $2@@'
+            '\n'
+        )
+
+        doc = (
+            f'#+title: {title}\n' +
+            options +
+            macros +
+            '#+html_head: <style>img { float: center; width: 50%; }</style>\n'
+            f'#+html_head: {lrc}\n' +
+            '\n'.join(['#+html_head: ' + hfn.metatag(**md) for md in metas]) +
+            body)
+
+        return ct(doc)
+
+        #return hfn.htmldoc(body,
+                           #title=data['title'],
+                           #other=(lrc,),
+                           #metas=metas,
+                           #styles=tuple(),)
+
     @staticmethod
     def _get_user_jwt(resp):
         """ an aweful way to get this that surely will break """
@@ -505,29 +1079,7 @@ class Pio(formats.Rdf, idlib.Stream):
         if self._pio_header is None:
             # FIXME TODO private ...
             if self.identifier.is_private():
-                resp1 = self._requests.get(self.asUri())
-                user_jwt = self._get_user_jwt(resp1)
-                headers = {'Authorization': f'Bearer {user_jwt}'}
-                gau = apiuri.replace('www', 'go').replace('v3', 'v1')
-                fields = '?fields[]=' + '&fields[]='.join(
-                    ( # FIXME TODO need to match this list up to other things we need
-                        'doi',
-                        'protocol_name',
-                        'protocol_name_html',
-                        'creator',
-                        'authors',
-                        'description',
-                        'link',
-                        'created_on',
-                        'last_modified',
-                        'public',
-                        'doi_status',
-                        'materials_text',
-                        'version',
-                        'keywords',
-                     )
-                )
-                resp = self._requests.get(gau + fields, headers=headers)
+                resp = self._get_direct(apiuri, cache=False)
             else:
                 if self.identifier == self.identifier.uri_api_int:
                     prog = self.progenitor(type='id-converted-from')

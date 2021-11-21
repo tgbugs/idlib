@@ -174,6 +174,22 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         assert not bads, bads
             
 
+    def test_org(self):
+        p = idlib.Pio('pio.api:30899')
+        #p = idlib.Pio('pio.api:19174')
+        #p = idlib.Pio('pio.api:31399')
+
+        #dd = p._data_direct()
+        #j = dd.json()['protocol']
+
+        #p1 = idlib.Pio('pio.api1:19174')
+        d = p.data()
+        d1 = p.data1()
+        #breakpoint()
+        print(p.asOrg())
+        with open('/tmp/ptc.org', 'wt') as f:
+            f.write(p.asOrg())
+
 
 @skipif_ci
 class TestPioUser(HelpTestStreams, unittest.TestCase):
