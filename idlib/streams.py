@@ -125,11 +125,17 @@ class Stream:
         """ As a cell in a table. """
         # TODO Distinct from asTabular in that asTabular is probably a row?
         if hasattr(self, '_id_class') and self._id_class:
-            local = self.identifier.asLocal()
+            if self._id_class == str:
+                local = self.identifier
+            else:
+                local = self.identifier.asLocal()
             try:
                 if not self.label:
                     return local
             except (exc.ResolutionError, exc.RemoteError) as e:
+                log.exception(e)
+                return local
+            except NotImplementedError as e:  # idlib.Identifier case
                 log.exception(e)
                 return local
 
