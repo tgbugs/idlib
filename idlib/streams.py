@@ -136,6 +136,7 @@ class Stream:
                 log.exception(e)
                 return local
             except NotImplementedError as e:  # idlib.Identifier case
+                log.error(f'self.label not implemented for {self.__class__}')
                 log.exception(e)
                 return local
 

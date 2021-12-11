@@ -88,7 +88,8 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!
               'pio.edit': 'https://www.protocols.io/edit/',  # sigh
               'pio.run': 'https://www.protocols.io/run/',  # sigh
               'pio.private': 'https://www.protocols.io/private/',
-              'pio.fileman': 'https://www.protocols.io/file-manager/',  # XXX bad semantics
+              #'pio.fileman': 'https://www.protocols.io/file-manager/',  # XXX bad semantics
+              #'pio.folders.api': 'https://www.protocols.io/api/v3/folders/',  # XXX bad semantics
               'pio.api': 'https://www.protocols.io/api/v3/protocols/',
               'pio.api1': 'https://www.protocols.io/api/v1/protocols/',
 })
@@ -97,7 +98,7 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!
 class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _namespaces = _PioPrefixes
     _local_conventions = _namespaces
-    canonical_regex = '^https://www.protocols.io/(view|edit|private|file-manager|api/v3/protocols)/'
+    canonical_regex = '^https://www.protocols.io/(view|edit|private|api/v3/protocols)/'
 
     _slug_0_limit = 128  # 113 < ??? < 136
     _slug_0_m = 8
@@ -132,7 +133,7 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
                                suffix=suffix)
 
         self._unnormalized = curie_or_iri if curie_or_iri else self.iri
-        if self.prefix not in self._local_conventions or prefix == 'pio.fileman':
+        if self.prefix not in self._local_conventions:
             # protocols io fileman folders are not citable artifacts
             raise exc.MalformedIdentifierError(
                 f'Not a protocols.io id: {self}')
