@@ -162,6 +162,29 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
             try:
                 self._resp_metadata.raise_for_status()
             except Exception as e:
+                if not resp.ok and resp.status_code != 404:  # FIXME control flow here is bad
+                    return self._metadata_datacite(identifier)
+                else:
+                    raise exc.RemoteError(identifier) from e
+
+    def _metadata_datacite(self, identifier):
+        """ Try to get data directly from datacite api """
+        # FIXME TODO this is why we need a remote/repository class
+        # to simplify requesting data on an identifier from a remote
+        # what we have here does not compose well at all
+        accept = (
+            'application/vnd.datacite.datacite+json, '  # first so it can fail
+            'application/json, '  # undocumented fallthrough for crossref ?
+        )
+        datacite_api = f"https://api.datacite.org/dois/{identifier.suffix}"
+        resp = self._requests.get(datacite_api, headers={'Accept': accept})
+        self._resp_metadata = resp  # FIXME for progenitor
+        if resp.ok:
+            return resp.json()
+        else:
+            try:
+                self._resp_metadata.raise_for_status()
+            except Exception as e:
                 raise exc.RemoteError(identifier) from e
 
     @cache_result  # FIXME very much must cache these
