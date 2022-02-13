@@ -126,11 +126,14 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
         else:
             normalized = None
 
-        self = super().__new__(cls,
-                               curie_or_iri=normalized,
-                               iri=iri,
-                               prefix=prefix,
-                               suffix=suffix)
+        try:
+            self = super().__new__(cls,
+                                   curie_or_iri=normalized,
+                                   iri=iri,
+                                   prefix=prefix,
+                                   suffix=suffix)
+        except PioId.Error as e:
+            raise exc.MalformedIdentifierError((normalized, iri, prefix, suffix)) from e
 
         self._unnormalized = curie_or_iri if curie_or_iri else self.iri
         if self.prefix not in self._local_conventions:

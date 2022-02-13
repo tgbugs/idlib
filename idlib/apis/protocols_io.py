@@ -69,6 +69,9 @@ def get_auth_code(url):
 
 def get_protocols_io_auth(creds_file,
                           store_file=auth.get_path('protocols-io-api-store-file'),
+                          # yes reading from the store file here at the top level
+                          # increases startup time, however if it is burried then
+                          # any config error is deferred until later in runtime
                           SCOPES='readwrite'):
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request

@@ -213,18 +213,22 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
 
     def metadata_events(self):
         """ metadata about dois from the crossref events api """
+        import augpathlib as aug
         events_endpoint = 'https://api.eventdata.crossref.org/v1/events'
-        rp = aug.RepoPath(__file__)
+        rp = aug.RepoPath(__file__)  # FIXME need __file__ from the calling scope
         try:
             email = rp.repo.config_reader().get_value('user', 'email')
-            log.warning(f'your email {email} is being sent to crossref as part of the friendly way to use their api')
+            log.warning(
+                (f'your email {email} is being sent to crossref as '
+                 'part of the friendly way to use their api'))
             mailto = f'mailto={email}'
         except aug.exceptions.NotInRepoError:
             # TODO failover to the git repo api?
             mailto = 'tgbugs+idlib-no-git@gmail.com'
 
-        resp_obj = self._requests.get(f'{events_endpoint}?{mailto}&obj-id={self.handle}')
-        resp_sub = self._requests.get(f'{events_endpoint}?{mailto}&subj-id={self.handle}')
+        handle = self.identifier.suffix
+        resp_obj = self._requests.get(f'{events_endpoint}?{mailto}&obj-id={handle}')
+        resp_sub = self._requests.get(f'{events_endpoint}?{mailto}&subj-id={handle}')
         # TODO if > 1000 get the rest using the pagination token
         yield from resp_sub.json()['message']['events']
         yield from resp_obj.json()['message']['events']

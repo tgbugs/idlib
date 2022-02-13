@@ -3,7 +3,7 @@ from setuptools import setup
 
 
 def find_version(filename):
-    _version_re = re.compile(r"__version__ = '(.*)'")
+    _version_re = re.compile(r"__version__ = ['\"](.*)['\"]")
     last = None  # match python semantics
     for line in open(filename):
         version_match = _version_re.match(line)
