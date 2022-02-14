@@ -149,13 +149,21 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'https://www.protocols.io/view/2080',
         # changeover likely at a -> b 2081 -> 2082
         'https://www.protocols.io/view/2088',
+
+        'https://www.protocols.io/view/19358',
+
+        'https://www.protocols.io/view/25122',
+
+        'https://www.protocols.io/view/21417',
+
     ]
     ids_bad = ['lol not an identifier']
 
     def test_users(self):
         for i in self.ids:
             d = self.stream(i)
-            print(d.creator.orcid)
+            if d.creator is not None:
+                print(d.creator.orcid)
             for a in d.authors:
                 if hasattr(a, 'orcid'):
                     print(a.orcid)
@@ -175,9 +183,10 @@ class TestPio(HelpTestStreams, unittest.TestCase):
             
 
     def test_org(self):
-        p = idlib.Pio('pio.api:30899')
+        #p = idlib.Pio('pio.api:30899')  # not public ?
         #p = idlib.Pio('pio.api:19174')
         #p = idlib.Pio('pio.api:31399')
+        p = idlib.Pio('pio.api:25122')  # is public
 
         #dd = p._data_direct()
         #j = dd.json()['protocol']

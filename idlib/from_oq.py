@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-#import requests
 import orthauth as oa
 import ontquery as oq  # temporary implementation detail
 import idlib
@@ -291,6 +290,9 @@ def setup(cls, creds_file=None):
         log.warning(e)
         cls._pio_header = None
 
+    if not hasattr(idlib.Stream, '_requests'):
+        idlib.Stream.__new__(cls)
+
 
 class Pio(formats.Rdf, idlib.Stream):
     """ instrumented protocols """
@@ -363,7 +365,7 @@ class Pio(formats.Rdf, idlib.Stream):
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
         try:
-            data = self.data()
+            data = self.data3()  # XXX data1 cannot bootstrap itself right now
         except exc.RemoteError as e:
             data = None
             try:
@@ -455,6 +457,9 @@ class Pio(formats.Rdf, idlib.Stream):
             # XXX careful about the contents going stale
             self._progenitors = {}
 
+        # XXX this can only get public protocols because
+        # we don't have a sane way to log in as a users
+        # to get a logged in bearer token
         resp1 = self._requests.get(self.asUri())
         user_jwt = self._get_user_jwt(resp1)
         headers = {'Authorization': f'Bearer {user_jwt}'}
@@ -477,17 +482,25 @@ class Pio(formats.Rdf, idlib.Stream):
         return self.uri_human._get_direct(self.identifier.uri_api)
 
     def data1(self, fail_ok=False):
+        # FIXME this depends on data3 for uri_human and cannot be used alone at the moment
+        # FIXME also only seems to work for public protocols at the moment?
+
         # FIXME needs robobrowser or similar to function without issues
         # because there is no oauth for it
         # get data from the api/v1 endpoint which is is needed for unmangled steps
         resp = self._data_direct()
         j = resp.json()
         if 'protocol' not in j:  # FIXME SIGH
+            if 'status_code' in j and j['status_code'] in (250, 205):
+                message = j['text'] + ' ' + self.identifier.asStr()
+                raise exc.NotAuthorizedError(message)
+
             return None
+
         data = j['protocol']
         return data
 
-    def data(self, fail_ok=False):
+    def data3(self, fail_ok=False):
         if not hasattr(self, '_data'):
             self._data_in_error = True
             if not isinstance(self._progenitors, dict):
@@ -557,6 +570,8 @@ class Pio(formats.Rdf, idlib.Stream):
                 self._get_data(_uai)
 
         return self._data
+
+    data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     def asOrg(self):
         from bs4 import BeautifulSoup
@@ -1180,7 +1195,9 @@ class Pio(formats.Rdf, idlib.Stream):
 
     @property
     def creator(self):
-        return PioUser('pio.user:' + self.data()['creator']['username'])
+        username = self.data()['creator']['username']
+        if username is not None:
+            return PioUser('pio.user:' + username)
 
     @property
     def authors(self):
@@ -1284,6 +1301,7 @@ class _PioUserPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
 
 _PioUserPrefixes({'pio.user': 'https://www.protocols.io/researchers/',
                   'pio.api.user': 'https://www.protocols.io/api/v3/researchers/',
+                  'pio.api1.user': 'https://www.protocols.io/api/v1/researchers/',
 })
 
 
@@ -1300,6 +1318,10 @@ class PioUserId(oq.OntId, idlib.Identifier, idlib.Stream):
     @property
     def uri_api(self):
         return self.__class__(prefix='pio.api.user', suffix=self.suffix)
+
+    @property
+    def uri_api1(self):
+        return self.__class__(prefix='pio.api1.user', suffix=self.suffix)
 
 
 class PioUser(idlib.HelperNoData, idlib.Stream):
@@ -1342,6 +1364,10 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
     def uri_api(self):
         return self.__class__(self.identifier.uri_api)
 
+    @property
+    def uri_api1(self):
+        return self.__class__(self.identifier.uri_api1)
+
     id_bound_metadata = uri_human
     identifier_bound_metadata = id_bound_metadata
     id_bound_ver_metadata = id_bound_metadata
@@ -1366,7 +1392,7 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
         # modify exactly which parts of a thing are returned
         # is problematic, but is also something that needs
         # to be tracked
-        return self.uri_api.asUri() + '?with_extras=1'
+        return self.uri_api1.asUri() + '?with_extras=1'
 
     @cache_result
     def metadata(self):
