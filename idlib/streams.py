@@ -429,15 +429,15 @@ class HelpTestStreams:
         if not hasattr(HelpTestStreams, '_requests'):
             import requests
             HelpTestStreams._requests = requests
-            from joblib import Parallel, delayed
-            HelpTestStreams._Parallel = Parallel
-            HelpTestStreams._delayed = delayed
             import hashlib
             HelpTestStreams._hashlib = hashlib
             import copy
             HelpTestStreams._copy = copy
             import pickle
             HelpTestStreams._pickle = pickle
+            from joblib import Parallel, delayed
+            HelpTestStreams._Parallel = Parallel
+            HelpTestStreams._delayed = delayed
 
     @classmethod
     def _lol_joblib(cls, d):
