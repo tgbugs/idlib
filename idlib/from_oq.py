@@ -1477,5 +1477,9 @@ class Auto:
         if 'protocols.io' in something:
             return idlib.Pio(something)
 
-        return oq.OntId(something)
-        return OntTerm(something)  # use the better local version of OntTerm
+        try:
+            return oq.OntId(something)
+            return OntTerm(something)  # use the better local version of OntTerm
+        except oq.OntId.Error as e:
+            raise exc.MalformedIdentifierError(something) from e
+
