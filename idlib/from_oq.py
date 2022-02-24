@@ -1102,8 +1102,13 @@ class Pio(formats.Rdf, idlib.Stream):
                 resp = self._get_direct(apiuri, cache=False)
             else:
                 if self.identifier == self.identifier.uri_api_int:
-                    prog = self.progenitor(type='id-converted-from')
-                    # XXX FIXME this will surely fail
+                    try:
+                        prog = self.progenitor(type='id-converted-from')
+                        # FIXME pretty sure this should return None instead of error?
+                    except KeyError as e:
+                        msg = 'no protocols io api credentials'
+                        raise exc.NotAuthorizedError(msg) from e
+
                     slug = prog.slug
                 else:
                     slug = self.slug
