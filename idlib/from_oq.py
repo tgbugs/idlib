@@ -521,6 +521,7 @@ class Pio(formats.Rdf, idlib.Stream):
                 self._progenitors['path'] = path
 
             if blob is None:
+                # XXX NOTE this assumes that path.exists() == True
                 with open(path, 'rt') as f:
                     blob = json.load(f)
 
@@ -545,6 +546,12 @@ class Pio(formats.Rdf, idlib.Stream):
                     except KeyError as e:
                         pass
 
+                    if fail_ok: return
+                    raise exc.NotAuthorizedError(message)
+                elif sc in (400,):
+                    # probably trying to get a pio.view:*.json url
+                    # their api is returning nonsense with 400 since
+                    # there is nothing wrong with the request ...
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
                 else:
@@ -1133,16 +1140,17 @@ class Pio(formats.Rdf, idlib.Stream):
                 j = resp.json()
                 sc = j['status_code']
                 em = j['error_message']
-                msg = (f'protocol issue {self.identifier} {resp.status_code} '
-                       f'{sc} {em}')
-                self._failure_message = msg  # FIXME HACK use progenitor instead
-                return {COOLDOWN: msg,
-                        'http_status_code': resp.status_code,
-                        'pio_status_code': sc,
-                        'error_message': em,}
-                # can't return here because of the cache
             except Exception as e:
-                log.exception(e)
+                sc = resp.status_code
+                em = resp.reason
+
+            msg = (f'protocol issue {self.identifier} {resp.url} '
+                   f'{resp.status_code} {sc} {em}')
+            self._failure_message = msg  # FIXME HACK use progenitor instead
+            return {COOLDOWN: msg,
+                    'http_status_code': resp.status_code,
+                    'pio_status_code': sc,
+                    'error_message': em,}
 
     metadata = data  # FIXME
 
