@@ -1106,7 +1106,7 @@ class Pio(formats.Rdf, idlib.Stream):
         if self._pio_header is None:
             # FIXME TODO private ...
             if self.identifier.is_private():
-                resp = self._get_direct(apiuri, cache=False)
+                resp = self._get_direct(apiuri)#, cache=False)
             else:
                 if self.identifier == self.identifier.uri_api_int:
                     try:
