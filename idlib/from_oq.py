@@ -270,7 +270,7 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
         return self.prefix == 'pio.private'
 
     def is_int(self):
-        return self.prefix == 'pio.api' and self.suffix.isdigit()
+        return self.prefix in ('pio.api', 'pio.view') and self.suffix.isdigit()
 
 
 def setup(cls, creds_file=None):
@@ -1103,8 +1103,9 @@ class Pio(formats.Rdf, idlib.Stream):
 
         # TODO progenitors
         log.debug('going to network for protocols')
-        if self._pio_header is None:
-            # FIXME TODO private ...
+        if self._pio_header is None and isinstance(self, Pio):
+            # the hacks in this branch only apply to the Pio class
+            # otherwise always use apiuri in the other branch
             if self.identifier.is_private():
                 resp = self._get_direct(apiuri)#, cache=False)
             else:
