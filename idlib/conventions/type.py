@@ -16,7 +16,10 @@ class ConvTypeBytesHeader(ConventionsType):
     def _findElement(self, element, chunk):
         m = re.search(element, chunk)
         if m is not None:
-            return m.end()
+            # FIXME icky api
+            return m.start(), m.end()
+        else:
+            return None, None
 
     def findStart(self, chunk):
         return self._findElement(self.start, chunk)
