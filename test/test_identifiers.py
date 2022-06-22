@@ -5,6 +5,9 @@ import idlib
 from idlib.streams import HelpTestStreams
 
 skipif_ci = pytest.mark.skipif('CI' in os.environ, reason='API key required')
+SKIP_NETWORK = ('SKIP_NETWORK' in os.environ or
+                'FEATURES' in os.environ and 'network-sandbox' in os.environ['FEATURES'])
+skipif_no_net = pytest.mark.skipif(SKIP_NETWORK, reason='Skipping due to network requirement')
 
 
 @pytest.mark.skip('Not ready.')
@@ -98,6 +101,7 @@ class TestRor(HelpTestStreams, unittest.TestCase):
             s = self.stream(id)
             assert s.checksumValid, f'oops, {id}'
 
+    @skipif_no_net
     def test_triples(self):
         from idlib.formats import rdf as _bind_rdf
         r = idlib.Ror(self.ids[0])
@@ -159,6 +163,7 @@ class TestPio(HelpTestStreams, unittest.TestCase):
     ]
     ids_bad = ['lol not an identifier']
 
+    @skipif_no_net
     def test_users(self):
         for i in self.ids:
             d = self.stream(i)
@@ -168,6 +173,7 @@ class TestPio(HelpTestStreams, unittest.TestCase):
                 if hasattr(a, 'orcid'):
                     print(a.orcid)
 
+    @skipif_no_net
     def test_id_int(self):
         bads = []
         for i in self.ids:
@@ -181,7 +187,7 @@ class TestPio(HelpTestStreams, unittest.TestCase):
 
         assert not bads, bads
             
-
+    @skipif_no_net
     def test_org(self):
         #p = idlib.Pio('pio.api:30899')  # not public ?
         #p = idlib.Pio('pio.api:19174')
