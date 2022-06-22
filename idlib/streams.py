@@ -427,6 +427,8 @@ class HelpTestStreams:
     @staticmethod
     def setUpClass():
         if not hasattr(HelpTestStreams, '_requests'):
+            import pytest
+            HelpTestStreams._pytest = pytest
             import requests
             HelpTestStreams._requests = requests
             import hashlib
@@ -485,7 +487,7 @@ class HelpTestStreams:
                     bads.append((tv, d))
 
             except self._requests.exceptions.ConnectionError as e:
-                pytest.skip('Internet done goofed')
+                self._pytest.skip('Internet done goofed')
 
             # test joblib
             self._lol_joblib(d)
@@ -548,7 +550,7 @@ class HelpTestStreams:
             try:
                 d = s.asDict()
             except self._requests.exceptions.ConnectionError as e:
-                pytest.skip('Internet done goofed')
+                self._pytest.skip('Internet done goofed')
 
 
 class StreamUri(Stream):
