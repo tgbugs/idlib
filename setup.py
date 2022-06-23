@@ -19,9 +19,9 @@ with open('README.md', 'rt') as f:
     long_description = f.read()
 
 org_require = ['beautifulsoup4[html5lib]']
-rdf_require = ['rdflib>=5.0.0rc1', 'pyontutils>=0.1.23']
+rdf_require = ['pyontutils>=0.1.28']
 oauth_require = ['google-auth-oauthlib']
-tests_require = (['pytest', 'joblib>=0.14.1'] +
+tests_require = (['pytest', 'joblib>=1.1.0'] +
                  org_require +
                  rdf_require +
                  oauth_require)
