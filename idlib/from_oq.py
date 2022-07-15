@@ -140,9 +140,17 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
             raise exc.MalformedIdentifierError(
                 f'Not a protocols.io id: {self}')
         return self
-        
+
+    @property
+    def uri_human(self):
+        return self.__class__(prefix='pio.view', suffix=self.slug)
+
     @property
     def uri_api(self):
+        #if self.prefix == 'pio.fileman':
+            #prefix = 'pio.folders.api'  # XXX prefix won't work here, requires a suffix /ids SIGH
+        #else:
+            #prefix = 'pio.api'
         return self.__class__(prefix='pio.api', suffix=self.slug)
 
     @property
@@ -236,6 +244,15 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
                 st = st[:3] + 'a' + st[3:]
                 m = self._slug_2_m
                 b = self._slug_2_b - 1
+        elif len(st) >= 12:  # new slug format and version nonsense
+            raise NotImplementedError(f'not reverse engineered yet {st!r}')
+            if st == 'yxmvmno69g3p':  # XXX the doi slug uses the old way, but internally they have some new way
+                # 55784 'b2qgqdtw' 'yxmvmno69g3p' ''
+                # 55789 'b2qmqdu6' '14egnzrrzg5d' 'v3' # next public
+                # 55798 'b2qwqdxe' '8epv51pz5l1b' 'v5' # new slug used in the doi
+                'https://www.protocols.io/view/55790'
+                'https://www.protocols.io/view/protocol-for-chronic-implantation-of-patch-electro-yxmvmno69g3p/v1'
+                breakpoint()
         else:
             m = self._slug_2_m
             b = self._slug_2_b
@@ -365,7 +382,11 @@ class Pio(formats.Rdf, idlib.Stream):
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
         try:
-            data = self.data3()  # XXX data1 cannot bootstrap itself right now
+            if len(self.slug_tail) >= 12:
+                hrm = self.__class__(self.identifier.uri_human)
+                data = hrm.data1(noh=True)
+            else:
+                data = self.data3()  # XXX data1 cannot bootstrap itself right now
         except exc.RemoteError as e:
             data = None
             try:
@@ -463,9 +484,11 @@ class Pio(formats.Rdf, idlib.Stream):
         resp1 = self._requests.get(self.asUri())
         user_jwt = self._get_user_jwt(resp1)
         headers = {'Authorization': f'Bearer {user_jwt}'}
+        # XXX the new version slugs have /v1 and /v3 tails >_< AAAAAAAAAAAAAAAAA
+        # XXX this substitution may not work as expected
         gau = (apiuri
-            #.replace('www', 'go')
-            .replace('v3', 'v1'))
+               #.replace('www', 'go')
+               .replace('/v3/', '/v1/'))
         #if cache:
             #oph = self._pio_header
             #try:
@@ -478,17 +501,21 @@ class Pio(formats.Rdf, idlib.Stream):
         return resp
 
 
-    def _data_direct(self):
-        return self.uri_human._get_direct(self.identifier.uri_api)
+    def _data_direct(self, noh=False):
+        if noh:
+            # XXX noh assumes that the originating form was a uri_human use at own risk
+            return self._get_direct(self.identifier.uri_api)
+        else:
+            return self.uri_human._get_direct(self.identifier.uri_api)
 
-    def data1(self, fail_ok=False):
+    def data1(self, fail_ok=False, noh=False):
         # FIXME this depends on data3 for uri_human and cannot be used alone at the moment
         # FIXME also only seems to work for public protocols at the moment?
 
         # FIXME needs robobrowser or similar to function without issues
         # because there is no oauth for it
         # get data from the api/v1 endpoint which is is needed for unmangled steps
-        resp = self._data_direct()
+        resp = self._data_direct(noh=noh)
         j = resp.json()
         if 'protocol' not in j:  # FIXME SIGH
             if 'status_code' in j and j['status_code'] in (250, 205):
@@ -578,7 +605,28 @@ class Pio(formats.Rdf, idlib.Stream):
 
         return self._data
 
-    data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    # data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+    def data(self):
+        if len(self.slug_tail) >= 12:
+            # FIXME this inverts what should be happening, which is
+            # using this information to return the real uri_human and
+            # then using that normalized uri instead of the crazy
+            # version slug thing, however, we still want provenance
+            # for how we got there, even if we toss the crazy slugs
+            self._progenitors = {}  # FIXME yes this blasts progens every time
+            uh = self.uri_human
+            uai = uh.uri_api_int
+            d3 = uai.data3()
+            self._progenitors['id-converted-to'] = uai
+            if 'path' in uai._progenitors:
+                self._progenitors['path'] = uai._progenitors['path']
+            elif 'stream-http' in uai._progenitors:
+                self._progenitors['stream-http'] = uai._progenitors['stream-http']
+
+            return d3
+        else:
+            return self.data3()
 
     def asOrg(self):
         from bs4 import BeautifulSoup

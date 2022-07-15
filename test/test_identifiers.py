@@ -132,6 +132,11 @@ class TestRrid(HelpTestStreams, unittest.TestCase):
 class TestPio(HelpTestStreams, unittest.TestCase):
     stream = idlib.Pio
     ids = [
+        'https://www.protocols.io/view/protocol-for-chronic-implantation-of-patch-electro-b2qgqdtw',
+        # api v3 fails for these slugs?
+        'https://www.protocols.io/view/protocol-for-chronic-implantation-of-patch-electro-yxmvmno69g3p',
+        #'https://www.protocols.io/view/protocol-for-chronic-implantation-of-patch-electro-yxmvmno69g3p/v1',
+
         'https://www.protocols.io/view/reuse-pc3diyn',
         'https://www.protocols.io/private/8DAE4D2451D5FE18A421D102BC2BEB39',
 
