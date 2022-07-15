@@ -607,7 +607,7 @@ class Pio(formats.Rdf, idlib.Stream):
 
     # data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-    def data(self):
+    def data(self, fail_ok=False):
         if len(self.slug_tail) >= 12:
             # FIXME this inverts what should be happening, which is
             # using this information to return the real uri_human and
@@ -617,7 +617,7 @@ class Pio(formats.Rdf, idlib.Stream):
             self._progenitors = {}  # FIXME yes this blasts progens every time
             uh = self.uri_human
             uai = uh.uri_api_int
-            d3 = uai.data3()
+            d3 = uai.data3(fail_ok=fail_ok)
             self._progenitors['id-converted-to'] = uai
             if 'path' in uai._progenitors:
                 self._progenitors['path'] = uai._progenitors['path']
@@ -626,7 +626,7 @@ class Pio(formats.Rdf, idlib.Stream):
 
             return d3
         else:
-            return self.data3()
+            return self.data3(fail_ok=fail_ok)
 
     def asOrg(self):
         from bs4 import BeautifulSoup
