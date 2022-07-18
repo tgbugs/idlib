@@ -608,7 +608,7 @@ class Pio(formats.Rdf, idlib.Stream):
     # data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     def data(self, fail_ok=False):
-        if not self.identifier.is_private and len(self.slug_tail) >= 12:
+        if not self.identifier.is_private() and len(self.slug_tail) >= 12:
             # FIXME this inverts what should be happening, which is
             # using this information to return the real uri_human and
             # then using that normalized uri instead of the crazy
