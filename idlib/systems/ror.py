@@ -136,7 +136,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
                 self._resp_metadata.raise_for_status()
             except BaseException as e:
                 # FIXME may not be a resolution error
-                raise exc.ResolutionError(identifier) from e
+                raise exc.ResolutionError(self.identifier) from e
 
     @property
     def name(self):
