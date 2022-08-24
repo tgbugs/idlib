@@ -136,7 +136,9 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
                 self._resp_metadata.raise_for_status()
             except BaseException as e:
                 # FIXME may not be a resolution error
-                raise exc.ResolutionError(self.identifier) from e
+                # if we are raising for status then it is definitely a RemoteError of some kind
+                # or the remote telling us that we are in error
+                raise exc.RemoteError(self.identifier) from e
 
     @property
     def name(self):
