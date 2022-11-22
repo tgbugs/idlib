@@ -406,6 +406,10 @@ class Pio(formats.Rdf, idlib.Stream):
             if uri:
                 return self.fromIdInit(prefix='pio.view', suffix=uri)
 
+    @property
+    def uri_human_html(self):
+        return self.fromIdInit(prefix='pio.view', suffix=f'{self.identifier_int}.html')
+
     id_bound_metadata = uri_human  # FIXME vs uri field
     identifier_bound_metadata = id_bound_metadata
 
