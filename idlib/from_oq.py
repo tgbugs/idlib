@@ -575,6 +575,10 @@ class Pio(formats.Rdf, idlib.Stream):
 
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
+                elif sc in (429,):  # too many requests
+                    if fail_ok: return
+                    path.unlink()  # hopefully works next time?
+                    raise exc.AccessLimitError(message)
                 elif sc in (400,):
                     # probably trying to get a pio.view:*.json url
                     # their api is returning nonsense with 400 since

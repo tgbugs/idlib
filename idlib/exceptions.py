@@ -116,3 +116,9 @@ class NotAuthorizedError(IdExistsButError):
     # FIXME 401 =/> that an id exists but 403 does? 401 is you cannot ask that question level/unknown
     # Don't be conused by the fact that HTTP calls these client errors
     # the client didn't do anything wrong
+
+
+class AccessLimitError(RemoteError):
+    """ the remote endpoint is feeling overwhelmed right now or
+        you have too many books checked out from the library """
+    # 429 too many requests and other such nonsense
