@@ -553,6 +553,14 @@ class Pio(formats.Rdf, idlib.Stream):
 
             if blob is None:
                 # XXX NOTE this assumes that path.exists() == True
+                # XXX whiiich turns out to be a bad assumption ...
+                if not path.exists():
+                    msg = f'assumption violation cache {path} dne for {self}'
+                    log.critical(msg)
+                    # TODO raise error or something, or figure out the
+                    # conditions under which this assumption goes bad
+                    return
+
                 with open(path, 'rt') as f:
                     blob = json.load(f)
 
