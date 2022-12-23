@@ -33,10 +33,13 @@ class RorId(oq.OntId, idlib.Identifier):
     local_regex = r'^0([0-9a-z]{6})([0-9]{2})$'
     canonical_regex = '^https://ror.org/0[0-9a-z]{6}[0-9]{2}$'
 
+    class RorMalformedError(exc.IdlibError):
+        """ WHAT HAVE YOU DONE!? """
+
     def __new__(cls, *args, **kwargs):
         self = super().__new__(cls, *args, **kwargs)
         if self.prefix is None or self.suffix is None:
-            raise cls.OrcidMalformedError(self)
+            raise cls.RorMalformedError(self)
         return self
 
     @property

@@ -2,6 +2,7 @@ from pathlib import Path
 import ontquery as oq  # temporary implementation detail
 import idlib
 from idlib import streams
+from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache
 from idlib.utils import cache_result, log
@@ -33,7 +34,7 @@ class OrcidId(oq.OntId, idlib.Identifier):
     canonical_regex = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
                        '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
 
-    class OrcidMalformedError(Exception):
+    class OrcidMalformedError(exc.IdlibError):
         """ WHAT HAVE YOU DONE!? """
 
     class OrcidLengthError(OrcidMalformedError):
