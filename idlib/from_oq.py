@@ -426,7 +426,7 @@ class Pio(formats.Rdf, idlib.Stream):
                     tries = 2
                     for _try in range(tries):
                         try:
-                            data = self.data3()  # XXX data1 cannot bootstrap itself right now
+                            data = self.data4()  # XXX data1 cannot bootstrap itself right now
                             break
                         except exc.AccessLimitError as e:
                             # FIXME this is SO dumb but we have no data from remote
@@ -567,7 +567,7 @@ class Pio(formats.Rdf, idlib.Stream):
             return self.uri_human._get_direct(self.identifier.uri_api)
 
     def data1(self, fail_ok=False, noh=False):
-        # FIXME this depends on data3 for uri_human and cannot be used alone at the moment
+        # FIXME this depends on data4 for uri_human and cannot be used alone at the moment
         # FIXME also only seems to work for public protocols at the moment?
 
         # FIXME needs robobrowser or similar to function without issues
@@ -585,7 +585,7 @@ class Pio(formats.Rdf, idlib.Stream):
         data = j['protocol']
         return data
 
-    def data3(self, fail_ok=False):
+    def data4(self, fail_ok=False):
         if not hasattr(self, '_data'):
             self._data_in_error = True
             if not isinstance(self._progenitors, dict):
@@ -679,7 +679,7 @@ class Pio(formats.Rdf, idlib.Stream):
 
         return self._data
 
-    # data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    # data = data4  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     def data(self, fail_ok=False):
         if hasattr(self, '_data_in_error_sigh') and self._data_in_error_sigh:
@@ -701,16 +701,16 @@ class Pio(formats.Rdf, idlib.Stream):
                 self._progenitors = {}  # FIXME yes this blasts progens every time
                 uh = self.uri_human
                 uai = uh.uri_api_int
-                d3 = uai.data3(fail_ok=fail_ok)
+                d4 = uai.data4(fail_ok=fail_ok)
                 self._progenitors['id-converted-to'] = uai
                 if 'path' in uai._progenitors:
                     self._progenitors['path'] = uai._progenitors['path']
                 elif 'stream-http' in uai._progenitors:
                     self._progenitors['stream-http'] = uai._progenitors['stream-http']
 
-                return d3
+                return d4
             else:
-                return self.data3(fail_ok=fail_ok)
+                return self.data4(fail_ok=fail_ok)
         except Exception as e:
             wait_until = time() + self._wait_time
             self._data_in_error_sigh = wait_until, e
