@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime, timezone
 from functools import wraps
@@ -53,6 +54,39 @@ class StringProgenitor(str):
     def __getnewargs_ex__(self):
         # have to str(self) to avoid infinite recursion
         return (str(self),), dict(progenitor=self._progenitor)
+
+
+def timeout(duration, *, error=None):
+    import signal
+    class InternalTimeoutError(TimeoutError): pass
+    def _alrm(n, frame):
+        raise InternalTimeoutError((n, frame))
+    def _timeout(f):
+        @wraps(f)
+        def inner(*args, **kwargs):
+            previous_handler = signal.getsignal(signal.SIGABRT)
+            signal.signal(signal.SIGALRM, _alrm)
+            signal.alarm(duration)
+            try:
+                return f(*args, **kwargs)
+            except InternalTimeoutError as e:
+                if error is not None:
+                    msg = f'function timed out {f}'
+                    raise error(msg) from e
+                else:
+                    log.error(e)
+                    return
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, previous_handler)
+        return inner
+    return _timeout
+
+
+if os.name == 'nt':
+    def timeout(f):
+        log.warning('no windows support for arbitrary timeouts right now')
+        return f
 
 
 def cache_result(method):

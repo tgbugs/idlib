@@ -1,4 +1,6 @@
+import re
 import json
+from time import time, sleep
 from datetime import datetime
 import orthauth as oa
 import ontquery as oq  # temporary implementation detail
@@ -10,6 +12,7 @@ from idlib import exceptions as exc
 from idlib import conventions as conv
 from idlib.cache import cache, COOLDOWN
 from idlib.utils import (log,
+                         timeout,
                          TZLOCAL,
                          cache_result,
                          base32_pio_encode,
@@ -89,7 +92,8 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!
               'pio.private': 'https://www.protocols.io/private/',
               #'pio.fileman': 'https://www.protocols.io/file-manager/',  # XXX bad semantics
               #'pio.folders.api': 'https://www.protocols.io/api/v3/folders/',  # XXX bad semantics
-              'pio.api': 'https://www.protocols.io/api/v3/protocols/',
+              'pio.api3': 'https://www.protocols.io/api/v3/protocols/',
+              'pio.api': 'https://www.protocols.io/api/v4/protocols/',
               'pio.api1': 'https://www.protocols.io/api/v1/protocols/',
 })
 
@@ -97,7 +101,7 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!
 class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _namespaces = _PioPrefixes
     _local_conventions = _namespaces
-    canonical_regex = '^https://www.protocols.io/(view|edit|private|api/v3/protocols)/'
+    canonical_regex = '^https://www.protocols.io/(view|edit|private|api/v4/protocols)/'
 
     _slug_0_limit = 128  # 113 < ??? < 136
     _slug_0_m = 8
@@ -310,6 +314,11 @@ def setup(cls, creds_file=None):
     if not hasattr(idlib.Stream, '_requests'):
         idlib.Stream.__new__(cls)
 
+    #cls._http_get = staticmethod(timeout(
+        #cls._timeout + 1, error=exc.CouldNotReachIndexError)(cls._requests.get))
+
+    cls._http_get = staticmethod(cls._requests.get)
+
 
 class Pio(formats.Rdf, idlib.Stream):
     """ instrumented protocols """
@@ -327,7 +336,8 @@ class Pio(formats.Rdf, idlib.Stream):
     headers = streams.StreamUri.headers
 
     _setup = classmethod(setup)
-
+    _timeout = 10  # FIXME sigh hardcoded
+    _wait_time = 60
     #_checked_whether_data_is_not_in_error = False
     #_data_is_in_error = True
     # we MUST assume that data is in error for all instances by
@@ -381,30 +391,57 @@ class Pio(formats.Rdf, idlib.Stream):
     @cache_result  # caching this cuts time in half for 2 calls etc. 5s / 10s over 25k calls
     def uri_human(self):  # FIXME HRM ... confusion with pio.private iris
         """ the not-private uri """
-        try:
-            if len(self.slug_tail) >= 12:
-                hrm = self.__class__(self.identifier.uri_human)
-                data = hrm.data1(noh=True)
+        # FIXME -slug/steps style uris really mess this up e.g.
+        # https://www.protocols.io/view/tache-dinning-ot2od024899-highresolutionmanometry-4ragv2e/steps
+        if hasattr(self, '_data_in_error_urih') and self._data_in_error_urih:
+            wait_until, error = self._data_in_error_urih
+            if time() < wait_until:
+                msg = 'keep waiting'
+                raise error.__class__(msg) from error
             else:
-                data = self.data3()  # XXX data1 cannot bootstrap itself right now
-        except exc.RemoteError as e:
-            data = None
+                self._data_in_error_urih = False
+
+        try:
+
             try:
-                proj = self.progenitor(type='id-converted-from')
-                # it should not be the case that we somehow find a
-                # private id here because data would have traversed
-                # and found it already and gotten the metadata
-                # FIXME doi, other int, private should all not be here
-                if not proj.identifier.is_int():
-                    return proj
+                if len(self.slug_tail) >= 12:
+                    hrm = self.__class__(self.identifier.uri_human)
+                    data = hrm.data1(noh=True)
                 else:
+                    tries = 2
+                    for _try in range(tries):
+                        try:
+                            data = self.data3()  # XXX data1 cannot bootstrap itself right now
+                            break
+                        except exc.AccessLimitError as e:
+                            # FIXME this is SO dumb but we have no data from remote
+                            sleep(self._wait_time - 1)
+                            if _try == (tries - 1):
+                                raise e
+
+            except exc.RemoteError as e:
+                data = None
+                try:
+                    proj = self.progenitor(type='id-converted-from')
+                    # it should not be the case that we somehow find a
+                    # private id here because data would have traversed
+                    # and found it already and gotten the metadata
+                    # FIXME doi, other int, private should all not be here
+                    if not proj.identifier.is_int():
+                        return proj
+                    else:
+                        raise e
+                except KeyError as e2:
                     raise e
-            except KeyError as e2:
-                raise e
-        if data:
-            uri = data['uri']
-            if uri:
-                return self.fromIdInit(prefix='pio.view', suffix=uri)
+            if data:
+                uri = data['uri']
+                if uri:
+                    return self.fromIdInit(prefix='pio.view', suffix=uri)
+
+        except Exception as sigh:
+            wait_until = time() + self._wait_time
+            self._data_in_error_urih = wait_until, sigh
+            raise sigh
 
     @property
     def uri_human_html(self):
@@ -485,14 +522,15 @@ class Pio(formats.Rdf, idlib.Stream):
         # XXX this can only get public protocols because
         # we don't have a sane way to log in as a users
         # to get a logged in bearer token
-        resp1 = self._requests.get(self.asUri())
+        resp1 = self._http_get(self.asUri(), timeout=self._timeout)
         user_jwt = self._get_user_jwt(resp1)
         headers = {'Authorization': f'Bearer {user_jwt}'}
         # XXX the new version slugs have /v1 and /v3 tails >_< AAAAAAAAAAAAAAAAA
         # XXX this substitution may not work as expected
         gau = (apiuri
                #.replace('www', 'go')
-               .replace('/v3/', '/v1/'))
+               .replace('/v3/', '/v1/')
+               .replace('/v4/', '/v1/'))
         #if cache:
             #oph = self._pio_header
             #try:
@@ -501,7 +539,8 @@ class Pio(formats.Rdf, idlib.Stream):
             #finally:
                 #self._pio_header = oph
         #else:
-        resp = self._requests.get(gau + self.fields, headers=headers)
+        resp = self._http_get(
+            gau + self.fields, headers=headers, timeout=self._timeout)
         return resp
 
 
@@ -604,6 +643,10 @@ class Pio(formats.Rdf, idlib.Stream):
                 if 'status_code' in blob and 'protocol' in blob:
                     self._status_code = blob['status_code']
                     self._data = blob['protocol']
+                if 'status_code' in blob and 'payload' in blob:
+                    # v4
+                    self._status_code = blob['status_code']
+                    self._data = blob['payload']
                 elif 'id' in blob:  # not via the api
                     self._status_code = 200
                     self._data = blob
@@ -624,25 +667,39 @@ class Pio(formats.Rdf, idlib.Stream):
     # data = data3  # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     def data(self, fail_ok=False):
-        if not self.identifier.is_private() and len(self.slug_tail) >= 12:
-            # FIXME this inverts what should be happening, which is
-            # using this information to return the real uri_human and
-            # then using that normalized uri instead of the crazy
-            # version slug thing, however, we still want provenance
-            # for how we got there, even if we toss the crazy slugs
-            self._progenitors = {}  # FIXME yes this blasts progens every time
-            uh = self.uri_human
-            uai = uh.uri_api_int
-            d3 = uai.data3(fail_ok=fail_ok)
-            self._progenitors['id-converted-to'] = uai
-            if 'path' in uai._progenitors:
-                self._progenitors['path'] = uai._progenitors['path']
-            elif 'stream-http' in uai._progenitors:
-                self._progenitors['stream-http'] = uai._progenitors['stream-http']
+        if hasattr(self, '_data_in_error_sigh') and self._data_in_error_sigh:
+            wait_until, error = self._data_in_error_sigh
+            if time() < wait_until:
+                if fail_ok: return
+                msg = 'keep waiting'
+                raise error.__class__(msg) from error
+            else:
+                self._data_in_error_sigh = False
 
-            return d3
-        else:
-            return self.data3(fail_ok=fail_ok)
+        try:
+            if not self.identifier.is_private() and len(self.slug_tail) >= 12:
+                # FIXME this inverts what should be happening, which is
+                # using this information to return the real uri_human and
+                # then using that normalized uri instead of the crazy
+                # version slug thing, however, we still want provenance
+                # for how we got there, even if we toss the crazy slugs
+                self._progenitors = {}  # FIXME yes this blasts progens every time
+                uh = self.uri_human
+                uai = uh.uri_api_int
+                d3 = uai.data3(fail_ok=fail_ok)
+                self._progenitors['id-converted-to'] = uai
+                if 'path' in uai._progenitors:
+                    self._progenitors['path'] = uai._progenitors['path']
+                elif 'stream-http' in uai._progenitors:
+                    self._progenitors['stream-http'] = uai._progenitors['stream-http']
+
+                return d3
+            else:
+                return self.data3(fail_ok=fail_ok)
+        except Exception as e:
+            wait_until = time() + self._wait_time
+            self._data_in_error_sigh = wait_until, e
+            raise e
 
     def asOrg(self):
         from bs4 import BeautifulSoup
@@ -734,16 +791,25 @@ class Pio(formats.Rdf, idlib.Stream):
                 text = ''.join(convert(c, ind) for c in soup.children)
                 return '^{' + text + '}'  # FIXME this needs to be preceeded by something else
 
+            if tag == 'sub':
+                text = ''.join(convert(c, ind) for c in soup.children)
+                return '_{' + text + '}'  # FIXME this needs to be preceeded by something else
+
             if tag == 'style':
                 return ''
 
-            if tag == 'b':
+            if tag == 'b' or tag == 'strong':  # semantic tags were a mistake
                 text = ''.join(convert(c, ind) for c in soup.children)
                 ts = text.strip()
                 if ts:
                     return '*' + ts + '*'
                 else:
                     return ''
+
+            if tag == 'p':  # FIXME headings
+                text = ''.join(convert(c, ind) for c in soup.children)
+                # newlines ? nah
+                return text.strip()
 
             if tag == 'span':
                 childs = list(soup.children)
@@ -1016,9 +1082,10 @@ class Pio(formats.Rdf, idlib.Stream):
                 # to translate this section (WAT)
                 if not hasattr(self.__class__, '_pio_units'):
                     # FIXME a bit more systematic approach perhaps
-                    resp = self._requests.get(
-                        'https://www.protocols.io/api/v3/units',
-                        headers=self._pio_header)
+                    resp = self._http_get(
+                        'https://www.protocols.io/api/v1/units',
+                        headers=self._pio_header,
+                        timeout=self._timeout)
                     j = resp.json()
                     self.__class__._pio_units = j['units']
 
@@ -1036,18 +1103,357 @@ class Pio(formats.Rdf, idlib.Stream):
             breakpoint()
             raise NotImplementedError(comp)
 
+        _pio_units_backup = {
+            # most from https://www.protocols.io/api/v1/units
+            1: 'µL',
+            2: 'mL',
+            3: 'L',
+            4: 'µg',
+            5: 'mg',
+            6: 'g',
+            7: 'kg',
+            8: 'ng',
+            9: 'Hz',
+            10: '°C',
+            11: '°К',
+            12: '°F',
+            13: 'Mass Percent',
+            14: '% volume',
+            15: 'Mass / % volume',
+            16: 'Parts per Million (PPM)',
+            17: 'Parts per Billion (PPB)',
+            18: 'Parts per Trillion (PPT)',
+            19: 'Mole Fraction',
+            20: 'Mole Percent',
+            21: 'Molarity (M)',
+            22: 'Molarity (m)',
+            23: 'Genome copies per ml',
+            24: 'μV',
+            25: 'ms',
+            26: 'pg',
+            27: 'Molarity dilutions',
+            28: 'millimolar (mM)',
+            29: 'micromolar (µM)',
+            30: 'nanomolar (nM)',
+            31: 'picomolar (pM)',
+            32: 'Room temperature',
+            33: 'rpm',
+            34: 'x g',
+            165: 'On ice',
+            200: 'cm',
+            201: 'mm',
+            202: 'µm',
+            203: 'nm',
+            204: 'mg/mL',
+            205: 'µg/µL',
+            206: '% (v/v)',
+            1324: 'rcf',
+            1359: 'Bar',
+            1360: 'Pa',
+            1787: 'mM',  # XXX missing from the api !??!
+        }
+
+        def format_block(block, bstep, lsreg=False):
+            if not hasattr(self.__class__, '_pio_units'):
+                # FIXME a bit more systematic approach perhaps
+                resp = self._http_get(
+                    'https://www.protocols.io/api/v1/units',  # v1 is public for this now?
+                    headers=self._pio_header,
+                    timeout=self._timeout)
+                j = resp.json()
+                self.__class__._pio_units = {u['id']:u['name'] for u in j['units']}
+                # FIXME TODO altert if there is _ever_ a change
+
+            def wr(macro, value):
+                return '{{{' + macro + '(' + value + ')}}}'
+
+            text = block['text']
+            if 'entityRanges' in block and block['entityRanges']:
+                #bstep['entityMap'][str(block['entityRanges'][0]['key'])]
+                if bstep is None:
+                    return text
+                rents = []
+                # collect the rents and then start from the end of the string
+                # so that we don't disturb the offsets probably
+                for er in block['entityRanges']:
+                    ent = bstep['entityMap'][str(er['key'])]
+                    rent = lambda t: None
+                    offset = er['offset']
+                    length = er['length']
+                    # known key referent types
+                    # concentration, temperature, duration
+
+                    # known other types
+                    # equipment
+                    # software
+                    # tables
+                    # image -> source original_name
+                    # link -> url
+                    type = ent['type']
+                    data = ent['data']
+                    # FIXME can't return from these, they have to embed
+                    if type == 'tables':
+                        try:
+                            tab = [
+                                [''
+                                 if c is None else
+                                 convert(BeautifulSoup(re.sub(r'[\t\n ]+', ' ', c).strip()), '')
+                                 for c in row] for row in data['data']]
+                        except Exception as e:
+                            breakpoint()
+                            raise e
+
+                        out = '\n'.join(['|' + '|'.join(c for c in r) for r in tab])
+                        _rent = out
+                        rent = lambda t, r=_rent: r
+                    elif type == 'equipment':
+                        l = data['link']
+                        t = data['type']
+                        b = data['brand']
+                        n = data['name']
+                        _rent = f'[[{l}][{t} {b} {n}]]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'software':
+                        l = data['link']
+                        d = data['developer']
+                        n = data['name']
+                        v = data['version']
+                        # os_name os_version repository
+                        _rent = f'[[{l}][{d} {n} {v}]]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'image':
+                        s = data['source']
+                        n = data['original_name']
+                        _rent = f'[[img:{s}][{n}]]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'link':
+                        if len(data) > 2:
+                            breakpoint()  # not just url
+                        url = data['url']
+                        _rent = f'[[{url}][{{t}}]]'
+                        rent = lambda t, r=_rent: r.format(t=t)
+                    elif type == 'command':
+                        name = data['name']
+                        cname = data['command_name']
+                        cmd = data['command'] if 'command' in data else ''  # v3
+                        os_name = data['os_name']
+                        os_version = data['os_version']
+                        osl = {'MATLAB': 'octave',}
+                        lang = osl[os_name] if os_name in osl else os_name
+                        desc = data['description'] if 'description' in data else ''  # v4
+
+                        ind = ''
+                        out = (
+                            f'{ind}#+caption: {cmd}\n'
+                            f'{ind}#+begin_src {lang} :runtime {os_name} :runtime-version {os_version}\n'
+                            f'{ind}{name}\n{ind}#+end_src\n')
+                        #_jd = json.dumps(source, indent=2)
+                        #jd = _jd.replace('\n', f'\n{ind}')
+                        #debug = f'\n{ind}#+begin_src json\n{jd}\n{ind}#+end_src\n'
+                        _rent = out  # + debug
+                        rent = lambda t, r=_rent: r
+                    elif type == 'safety':
+                        # FIXME nested blocks
+                        # TODO FIXME obviously have to bind to the actual block text
+                        v = '\n'.join(format_block(b, None, lsreg) for b in data['blocks'])
+                        _rent = wr('safety', v)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'notes':
+                        # FIXME nested blocks
+                        v = '\n'.join(format_block(b, None, lsreg) for b in data['blocks'])
+                        _rent = wr('notes', v)  # FIXME needs to be a block probably, multi lines etc.
+                        rent = lambda t, r=_rent: r
+                    elif type == 'reagents':
+                        ind = ''
+                        name = data['name'].strip().replace('\n', ' ').replace(',','\\,')
+                        url = data['url']
+                        sku = data['sku']  # sometimes rrid lurks here
+                        rrid = data['rrid']
+                        vendor = data['vendor']
+                        if 'RRID:' in sku:
+                            rrid = sku
+                        if rrid:
+                            # may pop vendor info out elsewhere into materials or something?
+                            rent = ind + '{{{' + f'rrid({name},{rrid})' + '}}}'
+                            #return f'[[{url}][{name} ({rrid})]]'  # FIXME proper citation etc.
+
+                        else:
+                            vname = vendor['name']  # TODO put in materials section I think
+                            #vurl = vendor['url']
+
+                            # FIXME macro need to escape ,
+                            if sku and url:
+                                rent = ind + '{{{reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
+                            elif url:
+                                rent = ind + '{{{reagent_url(' + name + ',' + url + ')}}}'
+                            elif sku:
+                                rent = ind + '{{{reagent_sku(' + name + ',' + sku + ')}}}'
+                            elif vname == 'Contributed by users':
+                                rent = ind + '{{{reagent(' + name + ')}}}'  # TODO markup
+                            else:
+                                rent = ind + '{{{reagentv(' + ','.join((name, vname)) + ')}}}'
+
+                        if lsreg:
+                            rent += ' \\\\'  # XXX hack to get a newline
+
+                        _rent = rent
+                        rent = lambda t, r=_rent: r
+
+                    elif type == 'file':
+                        url = data['source']
+                        name = data['original_name']
+                        _rent = f'[[{url}][{name}]]'  # TODO render file type somehow?
+                        rent = lambda t, r=_rent: r
+                    elif type == 'citation':
+                        # TODO sure the diversity of formats is larger than this
+                        doi = data['doi']
+                        ndoi = doi  # TODO normalize
+                        title = data['title']
+                        _rent = f'[[{ndoi}][{title}]]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'protocols':
+                        id = data['id']  # FIXME surely there is more than one ??
+                        # XXX catalog these probably?
+                        # TODO self.asOrgLink()
+                        ref = self.__class__.fromIdInit(prefix='pio.api', suffix=str(id))
+                        _rent = f'[[{ref.uri_human_html.asUri()}][{ref.title}]]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'result':
+                        _rent = '\n'.join(format_block(b, data, lsreg)
+                                          for b in data['blocks'])
+                        rent = lambda t, r=_rent: r
+                    elif type == 'code_insert':
+                        log.warning('TODO')
+                        _rent = str(data)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'tex_formula':
+                        eff = data['formula']
+                        # need strict for sub/super script
+                        #work = eff
+                        #for ss in '_^':
+                        #    # XXX this is a completely broken hueristic
+                        #    # needs to recurse which we are not doing here
+                        #    if ss in work:
+                        #        before, after = work.split(ss, 1)
+                        #        if ' ' in after:  # XXX more splits
+                        #            wrap, rest = after.split(' ', 1)
+                        #            work = before + ss + '{' + wrap + '}' + ' ' + rest
+                        #        else:
+                        #            work = before + ss + '{' + after + '}'
+
+                        _rent = f'\\({eff}\\)'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'concentration':
+                        value = data[type]  # XXX strings
+                        _unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        if _unit == 'Molarity (M)':
+                            unit = 'mol/l'
+                        elif _unit == 'Micromolar (µM)':
+                            unit = 'µmol/l'
+                        elif _unit == 'Nanomolar (nM)':
+                            unit = 'nmol/l'
+                        elif _unit == 'Mass Percent':
+                            unit = '% mass'
+                        elif _unit == 'Volume Percent':
+                            unit = '% volume'
+                        elif _unit == 'Mass/Volume Percent':
+                            # what in the name of all unholy dimensionalities is this !?!?
+                            unit = '% mass/volume'
+                        else:
+                            log.warning(f'unhandled unit {_unit}')
+                            unit = _unit
+
+                        _rent = wr('concentration', value + unit)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'temperature':
+                        value = data[type]  # XXX strings
+                        unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        _rent = wr('temperature', value + unit)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'duration':
+                        value = data[type]  # XXX strings
+                        if 'unit' in data:
+                            unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        else:
+                            unit = ''
+                        _rent = wr('duration', str(value) + unit)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'amount':
+                        value = data[type]  # XXX strings
+                        log.debug(('sigh', value, data['unit'], self.uri_human_html.asStr()))
+                        unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        _rent = wr('amount', value + unit)
+                        rent = lambda t, r=_rent: r
+                    elif type == 'embed':  # materials text
+                        log.debug(('ebed what?', data))
+                        continue  # no idea what this is for
+                    else:
+                        breakpoint()
+                        raise NotImplementedError(type)
+
+                    rents.append((offset, length, rent))
+
+                srents = sorted(rents, reverse=True)
+                otext = text
+                for offset, length, rent in srents:
+                    text = text[:offset] + rent(text[offset:offset + length]) + text[offset + length:]
+
+            btype = block['type']
+            # lol inlineStyleRanges not touching that
+            if btype == 'unordered-list-item':
+                text = text.strip()
+                lead = ' ' * block['depth']
+                text = f'{lead}- ' + text
+
+            text = text.rstrip()  # can't fstrip at this step due to plain lists XXX SO ANNOYING
+            return text
+
+        _seen_sections = set()
         def format_step(step, n):
             comps = []
-            for c in sorted(step['components'], # reverse=True,
-                            key=lambda c: c['order_id']):
-                fc = format_comp(c, n)
-                comps.append(fc)
+            if 'components' in step:  # v3
+                for c in sorted(step['components'], # reverse=True,
+                                key=lambda c: c['order_id']):
+                    fc = format_comp(c, n)
+                    comps.append(fc)
+            #elif 'blocks':  # TODO v4 recursion
+            elif 'step' in step:  # v4
+                # XXX all steps have sections and they repeat
+                nstr = step['number']
+                if nstr is None or n != float(nstr):  # XXX sigh float steps
+                    log.warning(f'step number is off {n} != {step["number"]}')
+                if step['section']:
+                    _sec = re.sub(r'[\t\n ]+', ' ', step['section']).strip()
+                    sec = convert(BeautifulSoup(_sec, 'html5lib'), '').strip()
+                    if sec not in _seen_sections:
+                        _seen_sections.add(sec)
+                        comps.append('** ' + sec + '\n*** :ignore:')
+                    else:
+                        comps.append('*** :ignore:')
+                # TODO
+                try:
+                    if step['step']:
+                        blob = json.loads(step['step'])
+                        #if 'entityMap' in blob and blob['entityMap']:
+                            #breakpoint()
+                        if blob['blocks']:  # XXX SIGH heterogenous types, thanks team
+                            # FIXME not so simple, we also need the entity map
+                            # to get the coordiates where things should be inserted
+                            # (internal screaming)
+                            comps.extend(
+                                [format_block(block, blob) for block in blob['blocks']])
+                except json.decoder.JSONDecodeError:
+                    breakpoint()
+            else:
+                msg = f'sigh:\n{step}'
+                raise NotImplementedError(msg)
 
             # FIXME big problems here
             return '\n'.join(comps)
 
         def format_mats(mats):
             # TODO molecular weight?
+            # FIXME are we create the bad http://NA type things or are they upstream?
             hs = 'name', 'sku', 'vendor name', 'chemical name', 'cas number', 'rrid', 'url'
             table = '\n| ' + ' | '.join(hs) + '\n|-'
             for m in mats:
@@ -1068,7 +1474,7 @@ class Pio(formats.Rdf, idlib.Stream):
         data = self.data()
         # FIXME may encounter anchoring issuse if we do this
         # will likely need to adjust accordingly
-        lrc = f'<link rel="canonical" href="{self.uri_api_int.asStr()}">'
+        lrc = f'<link rel="canonical" href="{self.uri_human_html.asStr()}">'
         doi = self.doi
         if doi:
             metas = (
@@ -1082,14 +1488,44 @@ class Pio(formats.Rdf, idlib.Stream):
             dict(name='og.url', content=self.uri_human.asStr()),
         )
 
-        helper = [s for s in data['steps'] # debug
-                  if [c for c in s['components'] if c['type_id'] in (24, 4, 3)]]
+        def _unpack_step(step):
+            if 'components' in step:  # v3
+                for c in step['components']:
+                    yield c
+            elif 'step' in step:  # v4
+                blob = json.loads(step['step'])
+                breakpoint()
 
-        _war = data['warning']
+        if data['steps'] is None:
+            data['steps'] = tuple()  # type uniformity, v4 api just as busted as v3
+
+        # so insanely broken and bad wow, nested json strings in json all my wat
+        for f in ('warning', 'guidelines'):
+            if isinstance(data[f], str) and 'blocks' in data[f]:
+                data[f] = json.loads(data[f])
+
+        if data['steps'] and 'components' in data['steps'][0]:  # v3
+            helper = [s for s in data['steps'] # debug
+                      if [c for c in _unpack_step(s)
+                          if c['type_id'] in (24, 4, 3)]]
+
+        if (isinstance(data['warning'], dict) and
+            'blocks' in data['warning']):
+            _war = '\n'.join(
+                format_block(b, data['warning'])
+                for b in data['warning']['blocks']).strip()
+        else:  # v3
+            _war = data['warning']
         _waf = convert(BeautifulSoup(_war, 'html5lib'), '').strip() if _war else ''
         warnings = ('\n* Warnings\n' + _waf if _waf else '')
 
-        _gls = data['guidelines']
+        if (isinstance(data['guidelines'], dict) and
+            'blocks' in data['guidelines']):
+            _gls = '\n'.join(
+                format_block(b, data['guidelines'])
+                for b in data['guidelines']['blocks']).strip()
+        else:  # v3
+            _gls = data['guidelines']
         _glf = convert(BeautifulSoup(_gls, 'html5lib'), '').strip() if _gls else ''
         guidelines = ('\n* Guidelines\n' + _glf if _glf else '')
 
@@ -1099,14 +1535,34 @@ class Pio(formats.Rdf, idlib.Stream):
         materials = ('\n* Materials\n' + format_mats(_mat).strip()
                      if _mat else '')
 
+        _matt = data['materials_text']
+        if _matt:
+            blob = json.loads(_matt)
+            _m = [format_block(b, blob, lsreg=True) for b in blob['blocks']]
+            for _thing in ('MATERIALS', 'STEP MATERIALS'):
+                if _thing in _m:
+                    _i = _m.index(_thing)
+                    _m[_i] += ' \\\\'
+
+            _mattf = '\n'.join(_m)
+            if materials:
+                materials += ('\n' + _mattf)
+            else:
+                materials = '\n* Materials\n' + _mattf
+
         body = (
-            f'\n\n[[{self.uri_human.asStr()}][Original on protocols.io]]\n' +
+            f'\n\n[[{self.uri_human_html.asStr()}][Original on protocols.io]]\n' +
             # guidelines warnings materials metadata
             warnings +
             guidelines +
             materials +
             '\n* Steps\n' +
-            '\n'.join(format_step(s, i + 1) for i, s in enumerate(data['steps'])))
+            '\n'.join(
+                format_step(s, i + 1)
+                for i, s in enumerate(sorted(
+                        data['steps'],
+                        key=(lambda d:[int(n) for n in d['number'].split('.')]
+                             if d['number'] is not None else [-1])))))
 
         title = data['title']
 
@@ -1125,6 +1581,12 @@ class Pio(formats.Rdf, idlib.Stream):
             '\n#+macro: reagentv =$1 ($2)='
             '\n#+macro: reagent =$1='
             '\n#+macro: software [[$3][$1]] @@comment: $2@@'
+            '\n#+macro: concentration =$1='
+            '\n#+macro: temperature =$1='
+            '\n#+macro: duration =$1='
+            '\n#+macro: amount =$1='
+            '\n#+macro: safety /*$1*/'
+            '\n#+macro: notes =$1='
             '\n'
         )
 
@@ -1171,7 +1633,11 @@ class Pio(formats.Rdf, idlib.Stream):
             # the hacks in this branch only apply to the Pio class
             # otherwise always use apiuri in the other branch
             if self.identifier.is_private():
-                resp = self._get_direct(apiuri)#, cache=False)
+                try:
+                    resp = self._get_direct(apiuri)#, cache=False)
+                except self._requests.exceptions.ReadTimeout as e:
+                    msg = f'failure on the way to {uriapi}'
+                    raise exc.CouldNotReachIndexError(msg) from e
             else:
                 if self.identifier == self.identifier.uri_api_int:
                     try:
@@ -1188,9 +1654,17 @@ class Pio(formats.Rdf, idlib.Stream):
                 hack = self._id_class(
                     prefix='pio.view',
                     suffix=slug).asStr() + '.json'
-                resp = self._requests.get(hack)
+                resp = self._http_get(hack, timeout=self._timeout)
         else:
-            resp = self._requests.get(apiuri, headers=self._pio_header)
+            # FIXME this can hang forever
+            try:
+                resp = self._http_get(
+                    apiuri, headers=self._pio_header, timeout=self._timeout)
+                #breakpoint()
+            except BaseException as e:
+                msg = f'barfed on {self.identifier!r} -> {apiuri!r}'
+                raise exc.IdlibError(msg) from e
+
         #log.info(str(resp.request.headers))
         self._progenitors['stream-http'] = resp
         if resp.ok:
@@ -1235,7 +1709,9 @@ class Pio(formats.Rdf, idlib.Stream):
 
     @property
     def hasVersions(self):
-        return bool(self.data()['has_versions'])
+        data = self.data()
+        return 'versions' in data and data['versions']
+        #return bool(self.data()['has_versions'])
 
     @property
     def versions(self):
@@ -1251,7 +1727,24 @@ class Pio(formats.Rdf, idlib.Stream):
     @property
     def updated(self):
         tzl = TZLOCAL()
-        return datetime.fromtimestamp(self.data()['changed_on'], tz=tzl)
+        # FIXME this can error when a cached result is not present
+        # and it is downloaded for the first time and then fails
+        # a complex repro
+        data = self.data()
+        if 'changed_on' in data:  # v3
+            co = data['changed_on']
+        elif 'versions' in data:
+            mos = [v['modified_on'] for v in data['versions'] if 'modified_on' in v]
+            if mos:
+                co = max(mos)
+            else:
+                log.debug(f'protocol has no updated time: {self.identifier}')
+                return self.created
+        else:
+            msg = f'what format is this? {data}'
+            raise NotImplementedError(msg)
+
+        return datetime.fromtimestamp(co, tz=tzl)
 
     @property
     def title(self):
@@ -1408,6 +1901,8 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
     _get_data = Pio._get_data
     asUri = Pio.asUri
     _setup = classmethod(setup)
+    _timeout = 10  # FIXME sigh hardcoded
+    _wait_time = 60
 
     identifier_actionable = streams.StreamUri.identifier_actionable
     dereference_chain = streams.StreamUri.dereference_chain

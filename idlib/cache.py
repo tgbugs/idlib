@@ -108,7 +108,8 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
                 # to prevent retrying on a persistent failure case
                 if fe:
                     reason = output[COOLDOWN]
-                    log.debug('currently in cooldown for {args} {kwargs} due to {reason}')
+                    msg = f'currently in cooldown for {args} {kwargs} due to {reason}'
+                    log.debug(msg)
 
                 # TODO add timing or remove cooldowns function
                 output = None
