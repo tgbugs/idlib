@@ -92,16 +92,16 @@ _PioPrefixes({'pio.view': 'https://www.protocols.io/view/',  # XXX TODO .html !!
               'pio.private': 'https://www.protocols.io/private/',
               #'pio.fileman': 'https://www.protocols.io/file-manager/',  # XXX bad semantics
               #'pio.folders.api': 'https://www.protocols.io/api/v3/folders/',  # XXX bad semantics
-              'pio.api3': 'https://www.protocols.io/api/v3/protocols/',
               'pio.api': 'https://www.protocols.io/api/v4/protocols/',
               'pio.api1': 'https://www.protocols.io/api/v1/protocols/',
+              'pio.api3': 'https://www.protocols.io/api/v3/protocols/',
 })
 
 
 class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _namespaces = _PioPrefixes
     _local_conventions = _namespaces
-    canonical_regex = '^https://www.protocols.io/(view|edit|private|api/v4/protocols)/'
+    canonical_regex = '^https://www.protocols.io/(view|edit|private|api/v[34]/protocols)/'
 
     _slug_0_limit = 128  # 113 < ??? < 136
     _slug_0_m = 8
@@ -160,6 +160,10 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     @property
     def uri_api1(self):
         return self.__class__(prefix='pio.api1', suffix=self.slug)
+
+    @property
+    def uri_api3(self):
+        return self.__class__(prefix='pio.api3', suffix=self.slug)
 
     def normalize(self):
         return self
@@ -274,6 +278,17 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     @property
     def uri_api_int(self):
         pid = self.__class__(prefix='pio.api', suffix=str(self.identifier_int))
+        if not isinstance(pid._progenitors, dict):
+            # FIXME is are these really progenitors in the way we usually
+            # think of them? ... maybe not?
+            pid._progenitors = {}
+
+        pid._progenitors['id-converted-from'] = self
+        return pid
+
+    @property
+    def uri_human_html(self):
+        pid = self.__class__(prefix='pio.view', suffix=f'{self.identifier_int}.html')
         if not isinstance(pid._progenitors, dict):
             # FIXME is are these really progenitors in the way we usually
             # think of them? ... maybe not?
@@ -1474,6 +1489,9 @@ class Pio(formats.Rdf, idlib.Stream):
         data = self.data()
         # FIXME may encounter anchoring issuse if we do this
         # will likely need to adjust accordingly
+        # XXX pio currently uses a bad url for canonical because it can change
+        # if someone changes the title of a protocol, they have the integer protocol
+        # id html page which would be perfect for the use case ... as we use it here
         lrc = f'<link rel="canonical" href="{self.uri_human_html.asStr()}">'
         doi = self.doi
         if doi:
