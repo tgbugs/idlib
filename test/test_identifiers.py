@@ -165,8 +165,12 @@ class TestPio(HelpTestStreams, unittest.TestCase):
 
         'https://www.protocols.io/view/21417',
 
+
     ]
-    ids_bad = ['lol not an identifier']
+    ids_bad = [
+        'lol not an identifier',
+        'https://www.protocols.io/view/18980',  # deleted
+    ]
 
     @skipif_no_net
     def test_users(self):

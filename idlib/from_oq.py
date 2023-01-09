@@ -625,7 +625,8 @@ class Pio(formats.Rdf, idlib.Stream):
                     raise NotImplementedError('asdf')
 
                 sc = blob['pio_status_code']
-                if sc == 212:  # Protocol does not exist
+                if sc == 212 or sc == 1:  # Protocol does not exist
+                    # 1 is for v4 and says 'invalid uri' which is ... poorly worded
                     if fail_ok: return
                     raise exc.IdDoesNotExistError(message)
                 elif sc in (250, 205):  # access requested, not authorized
@@ -1696,7 +1697,13 @@ class Pio(formats.Rdf, idlib.Stream):
             try:
                 j = resp.json()
                 sc = j['status_code']
-                em = j['error_message']
+                if 'error_message' in j:  # v3
+                    em = j['error_message']
+                elif 'status_text' in j:  # v4
+                    em = j['status_text']
+                else:
+                    log.error(f'what is this? {j}')
+                    raise NotImplementedError('sigh')
             except Exception as e:
                 sc = resp.status_code
                 em = resp.reason

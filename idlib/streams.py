@@ -499,8 +499,10 @@ class HelpTestStreams:
         for i in self.ids_bad:
             try:
                 d = self.stream(i)
-                d.append(bads)
-            except:
+                d.data()
+                bads.append(d)
+            except Exception as e:
+                log.exception(e)
                 pass
 
         assert not bads, bads
