@@ -115,6 +115,8 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
     _slug_2_m = 1024 ** 2 + 8  # 1048584
     _slug_2_b = 2111848180
 
+    _int_prefixes = 'pio.api', 'pio.api1', 'pio.api3', 'pio.view'
+
     def __new__(cls, curie_or_iri=None, iri=None, prefix=None, suffix=None):
         if curie_or_iri is None and iri:
             curie_or_iri = iri
@@ -306,7 +308,8 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
         return self.prefix == 'pio.private'
 
     def is_int(self):
-        return self.prefix in ('pio.api', 'pio.view') and self.suffix.isdigit()
+        return (self.prefix in self._int_prefixes
+                and self.suffix.isdigit())
 
 
 def setup(cls, creds_file=None):

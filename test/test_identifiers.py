@@ -164,12 +164,14 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'https://www.protocols.io/view/25122',
 
         'https://www.protocols.io/view/21417',
-
+        'https://www.protocols.io/api/v3/protocols/21417',
+        'https://www.protocols.io/api/v4/protocols/21417',
 
     ]
     ids_bad = [
         'lol not an identifier',
         'https://www.protocols.io/view/18980',  # deleted
+        'https://www.protocols.io/api/v3/protocols/18980',  # deleted
     ]
 
     @skipif_no_net
