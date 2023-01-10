@@ -56,7 +56,7 @@ def argspector(function):
     return spector
 
 
-def cache(folder, ser='json', clear_cache=False, create=False, return_path=False):
+def cache(folder, ser='json', clear_cache=False, create=False, return_path=False, debug=False):
     """ outer decorator to cache output of a function to a folder
 
         decorated functions accept an additional keyword argument
@@ -118,6 +118,16 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
                 return output, filepath
             else:
                 return output
+
+        if debug:
+            if return_path:
+                @wraps(function)
+                def superinner(*args, _refresh_cache=False, **kwargs):
+                    return function(*args, **kwargs), None
+            else:
+                @wraps(function)
+                def superinner(*args, _refresh_cache=False, **kwargs):
+                    return function(*args, **kwargs)
 
         return superinner
 

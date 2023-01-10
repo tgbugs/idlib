@@ -561,7 +561,6 @@ class Pio(formats.Rdf, idlib.Stream):
             gau + self.fields, headers=headers, timeout=self._timeout)
         return resp
 
-
     def _data_direct(self, noh=False):
         if noh:
             # XXX noh assumes that the originating form was a uri_human use at own risk
@@ -1637,7 +1636,7 @@ class Pio(formats.Rdf, idlib.Stream):
         eq, user_jwt, rest = after.split('"', 2)
         return user_jwt
 
-    @cache(auth.get_path('cache-path') / 'protocol_json', create=True, return_path=True)
+    @cache(auth.get_path('cache-path') / 'protocol_json', create=True, return_path=True, debug=False)
     def _get_data(self, apiuri):
         """ use apiuri as the identifier since it is distinct
             from other views of the protocol e.g. uri_human etc. """

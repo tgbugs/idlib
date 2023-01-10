@@ -167,6 +167,8 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'https://www.protocols.io/api/v3/protocols/21417',
         'https://www.protocols.io/api/v4/protocols/21417',
 
+        'pio.view:human-islet-microvasculature-immunofluorescence-in-y3tfynn/materials',
+
     ]
     ids_bad = [
         'lol not an identifier',
@@ -223,3 +225,14 @@ class TestPioUser(HelpTestStreams, unittest.TestCase):
     ids = [
         'pio.user:tom-gillespie',
     ]
+
+
+def test_stochastic_timeout():
+    i = 'pio.view:human-islet-microvasculature-immunofluorescence-in-y3tfynn/materials'
+    sigh = idlib.Pio(i)
+    wat = sigh.identifier.uri_api
+    sigh2 =  idlib.Pio(wat.curie)
+    d2 = sigh2.data()
+    d = sigh.data()
+    # FIXME this should aways try to go through the uri_api_int right ?!?!?!?
+    # or no? we decided that if you want the int form you should use that?
