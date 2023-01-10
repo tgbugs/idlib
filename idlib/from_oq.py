@@ -255,6 +255,8 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
                 m = self._slug_2_m
                 b = self._slug_2_b - 1
         elif len(st) >= 12:  # new slug format and version nonsense
+            # XXX new slug format comes from dois and can be resolved directly
+            # via the v4 api (yay!) 10.17504/protocols.io.{numbers} with optional /v{n} or /latest
             raise NotImplementedError(f'not reverse engineered yet {st!r}')
             if st == 'yxmvmno69g3p':  # XXX the doi slug uses the old way, but internally they have some new way
                 # 55784 'b2qgqdtw' 'yxmvmno69g3p' ''
@@ -315,19 +317,25 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
 def setup(cls, creds_file=None):
     """ because @classmethod only ever works in a single class SIGH """
     if creds_file is None:
-        try:
-            creds_file = auth.get_path('protocols-io-api-creds-file')
-        except KeyError as e:
-            raise TypeError('creds_file is a required argument'
-                            ' unless you have it in secrets') from e
+        client_token = auth.get('protocols-io-api-client-token')
+        if client_token is None:
+            try:
+                creds_file = auth.get_path('protocols-io-api-creds-file')
+            except KeyError as e:
+                raise TypeError('creds_file is a required argument'
+                                ' unless you have it in secrets') from e
 
-    try:
-        _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
+    if client_token:
         cls._pio_header = oa.utils.QuietDict(
-            {'Authorization': 'Bearer ' + _pio_creds.token})
-    except exc.ConfigurationError as e:
-        log.warning(e)
-        cls._pio_header = None
+            {'Authorization': 'Bearer ' + client_token})
+    else:
+        try:
+            _pio_creds = apis.protocols_io.get_protocols_io_auth(creds_file)
+            cls._pio_header = oa.utils.QuietDict(
+                {'Authorization': 'Bearer ' + _pio_creds.token})
+        except exc.ConfigurationError as e:
+            log.warning(e)
+            cls._pio_header = None
 
     if not hasattr(idlib.Stream, '_requests'):
         idlib.Stream.__new__(cls)
@@ -654,6 +662,15 @@ class Pio(formats.Rdf, idlib.Stream):
                     # there is nothing wrong with the request ...
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
+                elif sc == 1219:
+                    msg = 'access token expired'
+                    # TODO need to classify this error, note that
+                    # a 403ish thing may or may not mean that an id exists
+                    # also not clear where this fits relative speaking
+                    # the issue for this one is that the http semantics
+                    # and pio json mean there is an extra layer that needs
+                    # interpretation ... i.e. we definitely got to the remote
+                    raise NotImplementedError(msg)
                 else:
                     msg = f'unhandled pio status code {sc}\n' + message
                     raise NotImplementedError(msg)
@@ -776,7 +793,7 @@ class Pio(formats.Rdf, idlib.Stream):
                 if text:
                     return f'[[{href}][{soup.text}]]'
                 elif href == '#':
-                   return '{{{empty-link}}} '
+                   return '{{{pio-empty-link}}} '
                 else:
                     breakpoint()
                     return f'[[{href}]]'
@@ -941,7 +958,7 @@ class Pio(formats.Rdf, idlib.Stream):
                 dev = dev if dev else ''
                 repo = source['repository']
                 repo = repo if repo else ''
-                return ind + '{{{software(' + ','.join((name, dev, repo)) + ')}}}'
+                return ind + '{{{pio-software(' + ','.join((name, dev, repo)) + ')}}}'
             elif type_id == 9:  # dataset package
                 breakpoint()
                 raise NotImplementedError(comp)
@@ -1017,16 +1034,16 @@ class Pio(formats.Rdf, idlib.Stream):
 
                 # FIXME macro need to escape ,
                 if sku and url:
-                    return ind + '{{{reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
+                    return ind + '{{{pio-reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
                 if url:
-                    return ind + '{{{reagent_url(' + name + ',' + url + ')}}}'
+                    return ind + '{{{pio-reagent_url(' + name + ',' + url + ')}}}'
                 if sku:
-                    return ind + '{{{reagent_sku(' + name + ',' + sku + ')}}}'
+                    return ind + '{{{pio-reagent_sku(' + name + ',' + sku + ')}}}'
 
                 if vname == 'Contributed by users':
-                    return ind + '{{{reagent(' + name + ')}}}'  # TODO markup
+                    return ind + '{{{pio-reagent(' + name + ')}}}'  # TODO markup
 
-                return ind + '{{{reagentv(' + ','.join((name, vname)) + ')}}}'
+                return ind + '{{{pio-reagentv(' + ','.join((name, vname)) + ')}}}'
 
             elif type_id == 21:  # step cases
                 breakpoint()
@@ -1173,7 +1190,15 @@ class Pio(formats.Rdf, idlib.Stream):
             1163: 'U',  # XXX missing but from 35418  # XXX ALSO! USED INCORRECTLY PROBABLY!
             1164: '%',  # XXX missing but from 35418
             # OH NO ... units are user definable ?!?!?!?! WHAT NO
+            1638: 'mg/Kg',
+            1639: 'mcg/Kg',
+            1640: 'mg/Kg/h',
+            1641: 'Hz',
+            1642: 'mA',
+            # AS FORETOLD IN THE SCROLLS
+            1880: '%',  # KILLLL MEEEEEE
         }
+        # python -c 'import idlib; print(idlib.utils._pio_units()[-1])'
 
         def format_block(block, bstep, lsreg=False):
             if not hasattr(self.__class__, '_pio_units'):
@@ -1187,17 +1212,18 @@ class Pio(formats.Rdf, idlib.Stream):
                 # FIXME TODO altert if there is _ever_ a change
 
             def wr(macro, value):
-                return '{{{' + macro + '(' + value + ')}}}'
+                return '{{{pio-' + macro + '(' + value + ')}}}'
 
             text = block['text']
             if 'entityRanges' in block and block['entityRanges']:
                 #bstep['entityMap'][str(block['entityRanges'][0]['key'])]
                 if bstep is None:
                     return text
+                nents = len(block['entityRanges'])
                 rents = []
                 # collect the rents and then start from the end of the string
                 # so that we don't disturb the offsets probably
-                for er in block['entityRanges']:
+                for ent_index, er in enumerate(block['entityRanges']):
                     ent = bstep['entityMap'][str(er['key'])]
                     rent = lambda t: None
                     offset = er['offset']
@@ -1228,12 +1254,17 @@ class Pio(formats.Rdf, idlib.Stream):
                         out = '\n'.join(['|' + '|'.join(c for c in r) for r in tab])
                         _rent = out
                         rent = lambda t, r=_rent: r
-                    elif type == 'equipment':
-                        l = data['link']
+                    elif type == 'equipment':  # FIXME this is a much more complex object
+                        _l = data['link']
+                        sku = (' ' + data['sku']) if data['sku'] else ''
+                        vendor_link = data['vendor']['link'] if data['vendor'] else ''
+                        l = (_l if _l else
+                             (vendor_link if vendor_link else 'missing-link'))
+                        # TODO specifications etc. are not handled here
                         t = data['type']
                         b = data['brand']
                         n = data['name']
-                        _rent = f'[[{l}][{t} {b} {n}]]'
+                        _rent = f'[[{l}][{t} {b} {n}{sku}]]'
                         rent = lambda t, r=_rent: r
                     elif type == 'software':
                         l = data['link']
@@ -1250,7 +1281,9 @@ class Pio(formats.Rdf, idlib.Stream):
                         rent = lambda t, r=_rent: r
                     elif type == 'link':
                         if len(data) > 2:
-                            breakpoint()  # not just url
+                            msg = f'wierd link data > 2 case:\n{data}'
+                            log.warning(msg)
+                            #breakpoint()  # not just url
                         url = data['url']
                         _rent = f'[[{url}][{{t}}]]'
                         rent = lambda t, r=_rent: r.format(t=t)
@@ -1282,8 +1315,9 @@ class Pio(formats.Rdf, idlib.Stream):
                         rent = lambda t, r=_rent: r
                     elif type == 'notes':
                         # FIXME nested blocks
-                        v = '\n'.join(format_block(b, None, lsreg) for b in data['blocks'])
-                        _rent = wr('notes', v)  # FIXME needs to be a block probably, multi lines etc.
+                        ind = ''
+                        v = f'\n{ind}'.join(format_block(b, None, lsreg) for b in data['blocks'])
+                        _rent = f'\n{ind}#+begin_note\n{ind}{v}\n{ind}#+end_note'
                         rent = lambda t, r=_rent: r
                     elif type == 'reagents':
                         ind = ''
@@ -1292,11 +1326,12 @@ class Pio(formats.Rdf, idlib.Stream):
                         sku = data['sku']  # sometimes rrid lurks here
                         rrid = data['rrid']
                         vendor = data['vendor']
+                        # FIXME missing reagent vendor sku
                         if 'RRID:' in sku:
                             rrid = sku
                         if rrid:
                             # may pop vendor info out elsewhere into materials or something?
-                            rent = ind + '{{{' + f'rrid({name},{rrid})' + '}}}'
+                            rent = ind + '{{{' + f'pio-rrid({name},{rrid})' + '}}}'
                             #return f'[[{url}][{name} ({rrid})]]'  # FIXME proper citation etc.
 
                         else:
@@ -1305,18 +1340,23 @@ class Pio(formats.Rdf, idlib.Stream):
 
                             # FIXME macro need to escape ,
                             if sku and url:
-                                rent = ind + '{{{reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
+                                rent = ind + '{{{pio-reagent_skurl(' + name + ',' + sku + ',' + url + ')}}}'
                             elif url:
-                                rent = ind + '{{{reagent_url(' + name + ',' + url + ')}}}'
+                                rent = ind + '{{{pio-reagent_url(' + name + ',' + url + ')}}}'
+                            elif sku and vname:
+                                rent = ind + '{{{pio-reagentv_sku(' + ','.join((name, vname, sku))+ ')}}}'
                             elif sku:
-                                rent = ind + '{{{reagent_sku(' + name + ',' + sku + ')}}}'
+                                rent = ind + '{{{pio-reagent_sku(' + name + ',' + sku + ')}}}'
                             elif vname == 'Contributed by users':
-                                rent = ind + '{{{reagent(' + name + ')}}}'  # TODO markup
+                                rent = ind + '{{{pio-reagent(' + name + ')}}}'  # TODO markup
                             else:
-                                rent = ind + '{{{reagentv(' + ','.join((name, vname)) + ')}}}'
+                                rent = ind + '{{{pio-reagentv(' + ','.join((name, vname)) + ')}}}'
 
                         if lsreg:
-                            rent += ' \\\\'  # XXX hack to get a newline
+                            rent = '\n' + rent  # make sure the org is readable even if output is not
+                            if (ent_index + 1 == nents):
+                                # only add the line break if this is the last entity
+                                rent += ' \\\\'  # XXX hack to get a newline
 
                         _rent = rent
                         rent = lambda t, r=_rent: r
@@ -1402,8 +1442,14 @@ class Pio(formats.Rdf, idlib.Stream):
                         rent = lambda t, r=_rent: r
                     elif type == 'amount':
                         value = data[type]  # XXX strings
-                        log.debug(('sigh', value, data['unit'], self.uri_human_html.asStr()))
-                        unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        msg = ('sigh', value, data['unit'], self.uri_human_html.asStr())
+                        log.debug(msg)
+                        try:
+                            unit = _pio_units_backup[data['unit']]  # XXX obfuscated
+                        except:
+                            log.error(msg)
+                            raise
+
                         _rent = wr('amount', value + unit)
                         rent = lambda t, r=_rent: r
                     elif type == 'embed':  # materials text
@@ -1416,7 +1462,7 @@ class Pio(formats.Rdf, idlib.Stream):
                         _rent = wr('centrifuge', value + unit)
                         # pause preset start label all present?
                         if 'temperature' in data and data['temperature']:
-                            # empty string temp?
+                            # empty string temp? interpreted as room temp !??!?! insane !?
                             # TODO make this recursive probably?
                             tvalue = data['temperature']
                             tunit = (_pio_units_backup[data['temperatureUnit']]
@@ -1428,7 +1474,31 @@ class Pio(formats.Rdf, idlib.Stream):
                             # TODO duration units ????
                             _rent += wr('duration', data['duration'])
                         rent = lambda t, r=_rent: r
+                    elif type == 'imageblock':
+                        # TODO check how these are typeset
+                        _rent = '[[img:' + data['source'] + ']]'
+                        rent = lambda t, r=_rent: r
+                    elif type == 'ph':
+                        _rent = wr('ph', 'pH' + data['number'])
+                        rent = lambda t, r=_rent: r
+                    elif type == 'shaker':
+                        value = data[type]
+                        unit = _pio_units_backup[data['unit']] if 'unit' in data else ''
+                        _rent = wr('centrifuge', value + unit)
+                        # pause preset
+                        # scientificNotaiton ??? what this?
+                        if 'temperature' in data and data['temperature']:
+                            # empty string temp? interpreted as room temp !??!?! insane !?
+                            # TODO make this recursive probably?
+                            tvalue = data['temperature']
+                            tunit = (_pio_units_backup[data['temperatureUnit']]
+                                     if 'temperatureUnit' in data else '')
+                            _rent += 'at' + wr('temperature', tvalue + tunit)
+
+                        rent = lambda t, r=_rent: r
                     else:
+                        msg = f'TODO :type {type} :data {data} :id {self.identifier}'
+                        log.error(msg)
                         breakpoint()
                         raise NotImplementedError(type)
 
@@ -1617,20 +1687,21 @@ class Pio(formats.Rdf, idlib.Stream):
 
         # TODO probably want a span macro
         macros = (
-            '\n#+macro: empty-link *ERROR-UPSTREAM* '
-            '\n#+macro: rrid =$1 ($2)='
-            '\n#+macro: reagent_skurl =$1 ($2)= @@comment: $3@@'
-            '\n#+macro: reagent_sku =$1 ($2)='
-            '\n#+macro: reagent_url =$1= @@comment: $2@@'
-            '\n#+macro: reagentv =$1 ($2)='
-            '\n#+macro: reagent =$1='
-            '\n#+macro: software [[$3][$1]] @@comment: $2@@'
-            '\n#+macro: concentration =$1='
-            '\n#+macro: temperature =$1='
-            '\n#+macro: duration =$1='
-            '\n#+macro: amount =$1='
-            '\n#+macro: safety /*$1*/'
-            '\n#+macro: notes =$1='
+            '\n#+macro: pio-empty-link *ERROR-UPSTREAM* '
+            '\n#+macro: pio-rrid =$1 ($2)='
+            '\n#+macro: pio-reagent_skurl [[$3][=$1 ($2)=]]'
+            '\n#+macro: pio-reagentv_sku =$1 ($2 $3)='
+            '\n#+macro: pio-reagent_sku =$1 ($2)='
+            '\n#+macro: pio-reagent_url [[$2][=$1=]]'
+            '\n#+macro: pio-reagentv =$1 ($2)='
+            '\n#+macro: pio-reagent =$1='
+            '\n#+macro: pio-software [[$3][$1]] @@comment: $2@@'
+            '\n#+macro: pio-concentration =$1='
+            '\n#+macro: pio-temperature =$1='
+            '\n#+macro: pio-duration =$1='
+            '\n#+macro: pio-amount =$1='
+            '\n#+macro: pio-safety /*$1*/'
+            '\n#+macro: pio-notes =$1='
             '\n'
         )
 

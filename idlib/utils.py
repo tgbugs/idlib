@@ -169,6 +169,8 @@ def _pio_units():
 
     pids = (
         '35418',  # has all existing and two addition units relative to other protocols
+        '50627',
+        '59401',
     )
     for pid in pids:
         uri = f'https://www.protocols.io/api/v1/protocols/{pid}?fields[]=units'
