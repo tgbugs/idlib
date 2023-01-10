@@ -1123,6 +1123,7 @@ class Pio(formats.Rdf, idlib.Stream):
 
         _pio_units_backup = {
             # most from https://www.protocols.io/api/v1/units
+            # the others come from https://www.protocols.io/api/v1/protocols/113?fields[]=units
             1: 'µL',
             2: 'mL',
             3: 'L',
@@ -1168,7 +1169,10 @@ class Pio(formats.Rdf, idlib.Stream):
             1324: 'rcf',
             1359: 'Bar',
             1360: 'Pa',
-            1787: 'mM',  # XXX missing from the api !??!
+            1787: 'mM',  # XXX missing from the api !??! and from unknown protocol
+            1163: 'U',  # XXX missing but from 35418  # XXX ALSO! USED INCORRECTLY PROBABLY!
+            1164: '%',  # XXX missing but from 35418
+            # OH NO ... units are user definable ?!?!?!?! WHAT NO
         }
 
         def format_block(block, bstep, lsreg=False):
@@ -1366,7 +1370,7 @@ class Pio(formats.Rdf, idlib.Stream):
                         _unit = _pio_units_backup[data['unit']]  # XXX obfuscated
                         if _unit == 'Molarity (M)':
                             unit = 'mol/l'
-                        elif _unit == 'Micromolar (µM)':
+                        elif _unit in ('Micromolar (µM)', 'micromolar (µM)'):
                             unit = 'µmol/l'
                         elif _unit == 'Nanomolar (nM)':
                             unit = 'nmol/l'
@@ -1405,6 +1409,25 @@ class Pio(formats.Rdf, idlib.Stream):
                     elif type == 'embed':  # materials text
                         log.debug(('ebed what?', data))
                         continue  # no idea what this is for
+                    elif type == 'centrifuge':
+                        # seen in 31106
+                        value = data[type]
+                        unit = _pio_units_backup[data['unit']] if 'unit' in data else ''
+                        _rent = wr('centrifuge', value + unit)
+                        # pause preset start label all present?
+                        if 'temperature' in data and data['temperature']:
+                            # empty string temp?
+                            # TODO make this recursive probably?
+                            tvalue = data['temperature']
+                            tunit = (_pio_units_backup[data['temperatureUnit']]
+                                     if 'temperatureUnit' in data else '')
+                            _rent += 'at' + wr('temperature', tvalue + tunit)
+                        if 'duration' in data and data['duration']:
+                            # apparently zero duration is the default, which is ... quite silly
+                            # you want an unspecified number of seconds ... not zero seconds ...
+                            # TODO duration units ????
+                            _rent += wr('duration', data['duration'])
+                        rent = lambda t, r=_rent: r
                     else:
                         breakpoint()
                         raise NotImplementedError(type)

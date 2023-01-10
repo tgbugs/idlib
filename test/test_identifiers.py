@@ -227,6 +227,7 @@ class TestPioUser(HelpTestStreams, unittest.TestCase):
     ]
 
 
+@skipif_ci
 def test_stochastic_timeout():
     i = 'pio.view:human-islet-microvasculature-immunofluorescence-in-y3tfynn/materials'
     sigh = idlib.Pio(i)

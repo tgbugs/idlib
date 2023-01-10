@@ -159,3 +159,26 @@ rfc_alphabet       = 'abcdefghijklmnopqrstuvwxyz234567'
     base32_rfc_encode,
     base32_rfc_decode,
 ) = makeEnc(rfc_alphabet)
+
+
+def _pio_units():
+    # you should never actually call this, it is just to populate the static values for the backup
+    from collections import defaultdict
+    import requests
+    dd = defaultdict(set)
+
+    pids = (
+        '35418',  # has all existing and two addition units relative to other protocols
+    )
+    for pid in pids:
+        uri = f'https://www.protocols.io/api/v1/protocols/{pid}?fields[]=units'
+        resp = requests.get(uri)
+        j = resp.json()
+        if 'protocol' in j:
+            units = j['protocol']['units']
+            for unit in units:
+                dd[unit['id']].add(unit['name'])
+
+    a = {i:sorted(names) for i, names in dd.items()}
+    b = {k:v[0] for k, v in sorted(a.items())}
+    return a, b
