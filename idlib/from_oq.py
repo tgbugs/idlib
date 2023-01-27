@@ -462,7 +462,12 @@ class Pio(formats.Rdf, idlib.Stream):
             if data:
                 uri = data['uri']
                 if uri:
-                    return self.fromIdInit(prefix='pio.view', suffix=uri)
+                    pid = self.fromIdInit(prefix='pio.view', suffix=uri)
+                    if not isinstance(pid._progenitors, dict):
+                        pid._progenitors = {}
+
+                    pid._progenitors['id-converted-from'] = self
+                    return pid
 
         except Exception as sigh:
             wait_until = time() + self._wait_time
@@ -471,7 +476,12 @@ class Pio(formats.Rdf, idlib.Stream):
 
     @property
     def uri_human_html(self):
-        return self.fromIdInit(prefix='pio.view', suffix=f'{self.identifier_int}.html')
+        pid = self.fromIdInit(prefix='pio.view', suffix=f'{self.identifier_int}.html')
+        if not isinstance(pid._progenitors, dict):
+            pid._progenitors = {}
+
+        pid._progenitors['id-converted-from'] = self
+        return pid
 
     id_bound_metadata = uri_human  # FIXME vs uri field
     identifier_bound_metadata = id_bound_metadata
