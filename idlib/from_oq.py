@@ -595,6 +595,7 @@ class Pio(formats.Rdf, idlib.Stream):
         data = j['protocol']
         return data
 
+    _apiuri_private_cache = {}  # XXX FIXME hack
     def data4(self, fail_ok=False):
         if not hasattr(self, '_data'):
             self._data_in_error = True
@@ -648,7 +649,13 @@ class Pio(formats.Rdf, idlib.Stream):
                         # api identifier as well
                         return nself.data(fail_ok=fail_ok)
                     except KeyError as e:
-                        pass
+                        # see if we have recorded an id int to private mapping
+                        # these only work if the private id for a given int id
+                        # is been seen previously during the current run of the
+                        # program, we do not try to cross write the cache
+                        if apiuri in self._apiuri_private_cache:
+                            nself = self._apiuri_private_cache[apiuri]
+                            return nself.data(fail_ok=fail_ok)
 
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
@@ -691,6 +698,15 @@ class Pio(formats.Rdf, idlib.Stream):
 
             self._data_in_error = False
 
+            if self.identifier.is_private():
+                # hack around absent progenitors if clone id
+                _uai = self.uri_api_int.identifier.uri_api
+                if _uai not in self._apiuri_private_cache:
+                    self._apiuri_private_cache[_uai] = self
+
+            # note that at the moment it seems that the v4 api does
+            # not require api keys for accessing published protocols
+            # so this could be useful ? or no ? inverted issue ?
             if self._pio_header is None and not self.identifier.is_int():
                 # XXX out of band load the uri api int value
                 _uai = self.uri_api_int.identifier.uri_api
@@ -1748,8 +1764,10 @@ class Pio(formats.Rdf, idlib.Stream):
             # the hacks in this branch only apply to the Pio class
             # otherwise always use apiuri in the other branch
             if self.identifier.is_private():
+                # v4 private does not need keys
                 try:
-                    resp = self._get_direct(apiuri)#, cache=False)
+                    resp = self._http_get(apiuri, timeout=self._timeout)
+                    #resp = self._get_direct(apiuri)#, cache=False)
                 except self._requests.exceptions.ReadTimeout as e:
                     msg = f'failure on the way to {uriapi}'
                     raise exc.CouldNotReachIndexError(msg) from e
