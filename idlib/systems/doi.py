@@ -307,9 +307,11 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
         except exc.ResolutionError as e:
             log.exception(e)
             yield s, TEMP.resolutionError, rdflib.Literal(True)
+            return
         except exc.RemoteError as e:
             log.exception(e)
             yield s, TEMP.remoteError, rdflib.Literal(True)
+            return
 
         yield s, rdfs.label, rdflib.Literal(self.label)
 
