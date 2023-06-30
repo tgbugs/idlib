@@ -163,9 +163,36 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
                 self._resp_metadata.raise_for_status()
             except Exception as e:
                 if not resp.ok and resp.status_code != 404:  # FIXME control flow here is bad
-                    return self._metadata_datacite(identifier)
+                    try:
+                        return self._metadata_datacite(identifier)
+                    except Exception as e2:
+                        try:
+                            return self._metadata_crossref(identifier)
+                        except Exception as e3:
+                            raise exc.RemoteError(identifier) from e3
                 else:
                     raise exc.RemoteError(identifier) from e
+
+    def _metadata_crossref(self, identifier):
+        """ Sometimes crossref will barf due to redirecting to
+        https://api.crossref.org/v1/works/{shoulder}/{id}/transform
+        instead of just
+        https://api.crossref.org/v1/works/{shoulder}/{id}
+        """
+        accept = (
+            'application/json, '
+        )
+        crossref_api = f"https://api.crossref.org/v1/works/{identifier.suffix}"
+        resp = self._requests.get(crossref_api, headers={'Accept': accept})
+        self._resp_metadata = resp  # FIXME for progenitor
+        if resp.ok:
+            j = resp.json()
+            return j['message']
+        else:
+            try:
+                self._resp_metadata.raise_for_status()
+            except Exception as e:
+                raise exc.RemoteError(identifier) from e
 
     def _metadata_datacite(self, identifier):
         """ Try to get data directly from datacite api """
