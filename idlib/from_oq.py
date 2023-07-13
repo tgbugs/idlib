@@ -559,8 +559,9 @@ class Pio(formats.Rdf, idlib.Stream):
         # we don't have a sane way to log in as a users
         # to get a logged in bearer token
         resp1 = self._http_get(self.asUri(), timeout=self._timeout)
-        user_jwt = self._get_user_jwt(resp1)
-        headers = {'Authorization': f'Bearer {user_jwt}'}
+        #user_jwt = self._get_user_jwt(resp1)
+        #headers = {'Authorization': f'Bearer {user_jwt}'}
+        headers = {}  # seems like as of 2023-07ish api /v1 is open for public protocols?
         # XXX the new version slugs have /v1 and /v3 tails >_< AAAAAAAAAAAAAAAAA
         # XXX this substitution may not work as expected
         gau = (apiuri
@@ -1832,6 +1833,7 @@ class Pio(formats.Rdf, idlib.Stream):
                 sc = resp.status_code
                 em = resp.reason
 
+            # FIXME 429 should probably not embed here, and/or we need a proper way to disregard cooldowns and retry
             msg = (f'protocol issue {self.identifier} {resp.url} '
                    f'{resp.status_code} {sc} {em}')
             self._failure_message = msg  # FIXME HACK use progenitor instead
