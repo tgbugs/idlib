@@ -680,6 +680,14 @@ class Pio(formats.Rdf, idlib.Stream):
                     # there is nothing wrong with the request ...
                     if fail_ok: return
                     raise exc.NotAuthorizedError(message)
+                elif sc == 1218:
+                    # Authorization token is not correct
+                    # please use header Authorization: Bearer <access_token>
+                    # can happen if/when trying to retrieve a private protocol
+                    # via api v4 instead of v1
+                    msg = ('missing acces token or bad header not like '
+                           'Authorization: Bearer <access_token>')
+                    raise NotImplementedError(msg)
                 elif sc == 1219:
                     msg = 'access token expired'
                     # TODO need to classify this error, note that
@@ -756,6 +764,11 @@ class Pio(formats.Rdf, idlib.Stream):
                     self._progenitors['stream-http'] = uai._progenitors['stream-http']
 
                 return d4
+            elif self.identifier.is_private():
+                try:
+                    return self.data4(fail_ok=fail_ok)
+                except:
+                    return self.data1(fail_ok=fail_ok)
             else:
                 return self.data4(fail_ok=fail_ok)
         except Exception as e:
