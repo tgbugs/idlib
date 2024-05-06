@@ -175,6 +175,7 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'lol not an identifier',
         'https://www.protocols.io/view/18980',  # deleted
         'https://www.protocols.io/api/v3/protocols/18980',  # deleted
+        'https://www.protocols.io/private/D327A68038D5B4ECB32964C22D904270',  # deleted
     ]
 
     @skipif_no_net

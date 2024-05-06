@@ -149,7 +149,9 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
 
     @property
     def uri_human(self):
-        return self.__class__(prefix='pio.view', suffix=self.slug)
+        pid = self.__class__(prefix='pio.view', suffix=self.slug)
+        pid._id_converted_from = self
+        return pid
 
     @property
     def uri_api(self):
@@ -157,15 +159,21 @@ class PioId(oq.OntId, idlib.Identifier, idlib.Stream):
             #prefix = 'pio.folders.api'  # XXX prefix won't work here, requires a suffix /ids SIGH
         #else:
             #prefix = 'pio.api'
-        return self.__class__(prefix='pio.api', suffix=self.slug)
+        pid = self.__class__(prefix='pio.api', suffix=self.slug)
+        pid._id_converted_from = self
+        return pid
 
     @property
     def uri_api1(self):
-        return self.__class__(prefix='pio.api1', suffix=self.slug)
+        pid = self.__class__(prefix='pio.api1', suffix=self.slug)
+        pid._id_converted_from = self
+        return pid
 
     @property
     def uri_api3(self):
-        return self.__class__(prefix='pio.api3', suffix=self.slug)
+        pid = self.__class__(prefix='pio.api3', suffix=self.slug)
+        pid._id_converted_from = self
+        return pid
 
     def normalize(self):
         return self
@@ -584,8 +592,11 @@ class Pio(formats.Rdf, idlib.Stream):
         if noh:
             # XXX noh assumes that the originating form was a uri_human use at own risk
             return self._get_direct(self.identifier.uri_api)
-        else:
+        elif self.uri_human:
             return self.uri_human._get_direct(self.identifier.uri_api)
+        else:
+            msg = 'no beans'
+            raise NotImplementedError(msg)
 
     def data1(self, fail_ok=False, noh=False):
         # FIXME this depends on data4 for uri_human and cannot be used alone at the moment
@@ -595,11 +606,38 @@ class Pio(formats.Rdf, idlib.Stream):
         # because there is no oauth for it
         # get data from the api/v1 endpoint which is is needed for unmangled steps
         resp = self._data_direct(noh=noh)
+        # amazingly we get json even on fail ... 500 will not though
+        # I'm sure so some day this will break
         j = resp.json()
         if 'protocol' not in j:  # FIXME SIGH
-            if 'status_code' in j and j['status_code'] in (250, 205):
-                message = j['text'] + ' ' + self.identifier.asStr()
-                raise exc.NotAuthorizedError(message)
+            if 'status_code' in j:
+                # FIXME this is not the right way to do it
+                # we could be handed an id that was an api
+                # id that is clearly using the len 32 private
+                # id and we should probably just detect that
+                # instead of trying to chase conversion prov
+                # which can get broken for any number of reasons
+                id_was_private = False
+                _id = self.identifier
+                while True:
+                    if _id.is_private():
+                        id_was_private = True
+                        break
+                    elif not hasattr(_id, '_id_converted_from'):
+                        break
+                    else:
+                        _id = _id._id_converted_from
+
+                if j['status_code'] in (250, 205):
+                    message = j['status_text'] + ' ' + self.identifier.asStr()
+                    raise exc.NotAuthorizedError(message)
+                elif j['status_code'] == 1 and id_was_private:
+                    msg = (
+                        f'{j["status_text"]} private id might have existed before but '
+                        f'does not exist any more {self.identifier.asStr()}')
+                    raise exc.IdDoesNotExistError(msg)
+                else:
+                    raise NotImplementedError((resp.url, j))
 
             return None
 
@@ -767,10 +805,17 @@ class Pio(formats.Rdf, idlib.Stream):
             elif self.identifier.is_private():
                 try:
                     return self.data4(fail_ok=fail_ok)
-                except:
-                    return self.data1(fail_ok=fail_ok)
+                except exc.IdDoesNotExistError as ene:
+                    raise ene
+                except Exception as e0:
+                    try:
+                        return self.data1(fail_ok=fail_ok)
+                    except Exception as e1:
+                        raise exc.TransportError() from e1
             else:
                 return self.data4(fail_ok=fail_ok)
+        except (AttributeError, NotImplementedError) as e:
+            raise e
         except Exception as e:
             wait_until = time() + self._wait_time
             self._data_in_error_sigh = wait_until, e
@@ -2174,7 +2219,9 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
 
     @property
     def orcid(self):
-        orcid = self.metadata()['orcid']
+        md = self.metadata()
+        k = 'orcid'
+        orcid =  md[k]if k in md and md[k] else None
         if orcid is not None:
             return idlib.Orcid.fromIdInit(prefix='orcid', suffix=orcid)
 
@@ -2186,7 +2233,9 @@ class PioUser(idlib.HelperNoData, idlib.Stream):
 
     @property
     def bio(self):
-        return self.metadata()['bio']
+        md = self.metadata()
+        k = 'bio'
+        return md[k]if k in md and md[k] else None
 
     description = bio
 

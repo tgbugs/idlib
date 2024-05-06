@@ -57,7 +57,9 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     def id_bound_metadata(self):  # FIXME bound_id_metadata bound_id_data
         metadata = self.metadata()
         # wouldn't it be nice if all the metadata schemas had a common field called 'identifier' ?
-        id = metadata['rrid']['curie']
+        ids = set(m['rrid']['curie'] for m in metadata)
+        assert len(ids) == 1, ids
+        id = next(iter(ids))
         return self._id_class(id)
 
     identifier_bound_metadata = id_bound_metadata
@@ -78,8 +80,11 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         if metadata is not None:
             self._path_metadata = path
             self._progenitor_metadata_blob = metadata
-            source = metadata['hits']['hits'][0]['_source']
+            self._total_hits = metadata['hits']['total']
+            source = [h['_source'] for h in metadata['hits']['hits']]
             return source
+
+        return []
 
     def _cooldown(self):
         self._COOLDOWN = True
@@ -109,12 +114,11 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         # the identity of the RRID record ...
         m = cypher()
         metadata = self.metadata()
-        proper_citation = metadata['rrid']['properCitation']
+        proper_citations = sorted([m['rrid']['properCitation'] for m in metadata])
         m.update(self.identifier.checksum(cypher))
         m.update(self.id_bound_metadata.checksum(cypher))
-        m.update(proper_citation.encode())
-        for vuri in self.vendorUris:
-            m.update(vuri.encode())
+        for proper_citation in proper_citations:
+            m.update(proper_citation.encode())
 
         return m.digest()
 
@@ -122,33 +126,54 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     def vendorUris(self):
         metadata = self.metadata()
         if 'vendors' in metadata:  # FIXME SCR continues to be a bad citizen >_<
-            return [v['uri'] for v in metadata['vendors']]
+            return [v['uri'] if 'uri' in v else None for v in metadata['vendors']]
         else:
             return []
 
     @property
     def name(self):
-        m = self.metadata()
-        if m is not None:
-            return m['item']['name']
+        ms = self.metadata()
+        if ms:
+            names = set(m['item']['name'] for m in ms)
+            return sorted(names, key=len, reverse=True)[0]
 
     label = name
 
     @property
     def synonyms(self):
-        m = self.metadata()['item']
-        fs = 'label', 'synonyms', 'abbreviations'
-        out = []
-        for f in fs:
-            if f in m:
-                for v in m[f]:
-                    out.append(v)
+        ms = self.metadata()
+        out = set()
+        for m in ms:
+            it = m['item']
+            fs = 'label', 'name', 'nomenclature', 'synonyms', 'abbreviations'
+            for f in fs:
+                if f in it:
+                    thing = it[f]
+                    if isinstance(thing, list):
+                        for v in thing:
+                            if type(v) is dict:
+                                if 'name' in v:
+                                    for sigh in v['name'].split('. '):
+                                        syn = sigh.strip()
+                                        if syn:
+                                            out.add(syn)
+                                else:
+                                    breakpoint()
+                                    raise NotImplementedError(f'TODO {v}')
+                            else:
+                                out.add(v)
+                    else:
+                        out.add(thing)
 
-        return out
+        return sorted(out)
 
     @property
     def description(self):
-        return self.metadata()['item']['description']
+        ms = self.metadata()
+        if ms:
+            descs = set(m['item']['description'] for m in ms if 'description' in m['item'])
+            if descs:
+                return sorted(descs, key=len, reverse=True)[0]
 
     # alternate representations
 

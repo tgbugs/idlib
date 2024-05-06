@@ -451,8 +451,10 @@ class HelpTestStreams:
         # a separate loop?
         cypher = self._hashlib.blake2b
         bads = []
+        ds = []
         for i in self.ids:
             d = self.stream(i)
+            ds.append(d)
             d.identifier
             if d.identifier and hasattr(d.identifier, 'prefix'):
                 print(d.identifier)
@@ -547,10 +549,12 @@ class HelpTestStreams:
         assert i1.identifier is not i2
 
     def test_asDict(self):
+        ds = []
         for id in self.ids:
             s = self.stream(id)
             try:
                 d = s.asDict()
+                ds.append(d)
             except self._requests.exceptions.ConnectionError as e:
                 self._pytest.skip('Internet done goofed')
 
@@ -571,7 +575,6 @@ class StreamUri(Stream):
     # asIdentifiersDotOrg, asN2T, asInterpretedByResolverX etc.
 
     _id_class = None  # NOTE asssigned to idlib.Uri in idlib.__init__
-
 
     @property
     def identifier(self):
