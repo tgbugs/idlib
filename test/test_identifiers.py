@@ -58,6 +58,7 @@ class TestOrcid(HelpTestStreams, unittest.TestCase):
         'https://orcid.org/0000-0002-1825-0097',
         'https://orcid.org/0000-0001-5109-3700',
         'https://orcid.org/0000-0002-1694-233X',
+        'https://orcid.org/0009-0005-9822-0865',
     ]
     ids_bad = []
     for __i in ids:  # LOL PYTHON class scope list comprehensions

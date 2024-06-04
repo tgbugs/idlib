@@ -29,10 +29,9 @@ OrcidPrefixes({'orcid': 'https://orcid.org/',
 class OrcidId(oq.OntId, idlib.Identifier):
     _namespaces = OrcidPrefixes
     _local_conventions = _namespaces
-    local_regex = ('^0000-000(1-[5-9]|2-[0-9]|3-[0-4])'
-                   '[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
-    canonical_regex = ('^https://orcid.org/0000-000(1-[5-9]|2-[0-9]|3-'
-                       '[0-4])[0-9][0-9][0-9]-[0-9][0-9][0-9]([0-9]|X)$')
+    _common = '000[09]-00[01][0-9]-[0-9]{4}-[0-9]{3}([0-9]|X)'
+    local_regex = (f'^{_common}$')
+    canonical_regex = (f'^https://orcid.org/{_common}$')
 
     class OrcidMalformedError(exc.IdlibError):
         """ WHAT HAVE YOU DONE!? """
