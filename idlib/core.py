@@ -31,3 +31,14 @@ def resolution_chain_responses(iri, raise_on_final=True):
         elif head.status_code >= 400:
             msg = f'Nothing found due to {head.status_code} at {head.url}\n'
             raise exc.ResolutionError(msg)
+
+    if head.status_code >= 400:
+        # XXX this seems like the "right" thing to do, but it will
+        # probably break a bunch of stuff, but at least this way it
+        # will be visible now, obviously yeilding None as the final
+        # element in the reference chain conflates all the possible
+        # reasons so raising is a better solution and is the default
+        # for a reason but at least this way the user knows that the
+        # final element of the chain dereference to nothing instead of
+        # assuming that the last element succeeded
+        yield None

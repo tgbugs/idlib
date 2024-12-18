@@ -606,7 +606,7 @@ class StreamUri(Stream):
         if not self.identifier_actionable in dc:
             try:
                 dc[self.identifier_actionable] = tuple(
-                    StringProgenitor(resp.url, progenitor=resp)
+                    resp if resp is None else StringProgenitor(resp.url, progenitor=resp)
                     for resp in
                     self._resolution_chain_responses(self.identifier_actionable,
                                                      raise_on_final=False))
