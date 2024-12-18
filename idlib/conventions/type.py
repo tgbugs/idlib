@@ -13,19 +13,21 @@ class ConvTypeBytesHeader(ConventionsType):
         self.stop = stop
         self.sentinel = sentinel
 
-    def _findElement(self, element, chunk):
-        m = re.search(element, chunk)
+    def _findElement(self, element, chunk, prev):
+        to_search = prev + chunk
+        m = re.search(element, to_search)
         if m is not None:
+            lp = len(prev)
             # FIXME icky api
-            return m.start(), m.end()
+            return m.start() - lp, m.end() -lp
         else:
             return None, None
 
-    def findStart(self, chunk):
-        return self._findElement(self.start, chunk)
+    def findStart(self, chunk, prev):
+        return self._findElement(self.start, chunk, prev)
 
-    def findStop(self, chunk):
-        return self._findElement(self.stop, chunk)
+    def findStop(self, chunk, prev):
+        return self._findElement(self.stop, chunk, prev)
 
-    def findSentinel(self, chunk):
-        return self._findElement(self.sentinel, chunk)
+    def findSentinel(self, chunk, prev):
+        return self._findElement(self.sentinel, chunk, prev)
