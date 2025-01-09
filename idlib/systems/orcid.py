@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 import ontquery as oq  # temporary implementation detail
 import idlib
@@ -11,6 +12,22 @@ from idlib.config import auth
 
 # wiki has claims that Orcids are Isnis
 # but I need more information ...
+
+
+def genorcid():
+    """ generate a random orcid-like id suffix """
+    _09 = '09'
+    _01 = ''.join([str(_) for _ in range(2)])
+    _0_9 = ''.join([str(_) for _ in range(10)])
+    base = (
+        '000' + random.choice(_09) + '-' +
+        '00' + random.choice(_01) + random.choice(_0_9) + '-' +
+        ''.join(random.choice(_0_9) for _ in range(4))
+        + '-' +
+        ''.join(random.choice(_0_9) for _ in range(3)))
+    cs = OrcidId._digit_checksum(base.replace('-', ''))
+    fd = 'X' if cs == 10 else str(cs)
+    return base + fd
 
 
 class OrcidPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
@@ -68,6 +85,16 @@ class OrcidId(oq.OntId, idlib.Identifier):
 
         return self
 
+    @staticmethod
+    def _digit_checksum(digits):
+        total = 0
+        for digit_string in digits:
+            total = (total + int(digit_string)) * 2
+
+        remainder = total % 11
+        result = (12 - remainder) % 11
+        return result
+
     @property
     def checksumValid(self):
         """ see
@@ -77,12 +104,7 @@ class OrcidId(oq.OntId, idlib.Identifier):
         try:
             *digits, check_string = self.suffix.replace('-', '')
             check = 10 if check_string == 'X' else int(check_string)
-            total = 0
-            for digit_string in digits:
-                total = (total + int(digit_string)) * 2
-
-            remainder = total % 11
-            result = (12 - remainder) % 11
+            result = self._digit_checksum(digits)
             return result == check
         except ValueError as e:
             raise self.OrcidChecksumError(self) from e
