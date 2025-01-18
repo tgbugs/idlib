@@ -73,10 +73,25 @@ class TestOrcid(HelpTestStreams, unittest.TestCase):
     def test_asType(self):
         import rdflib
         from idlib.formats import rdf as _bind_rdf
-        o = idlib.Orcid(self.ids[0])
+        o = self.stream(self.ids[0])
         nt = o.asType(rdflib.URIRef)
         # still haven't decided if this is a good idea or not
         assert str(o) != str(nt), 'string representation of streams should not match id ???'
+
+
+class TestOrcidSandbox(TestOrcid):
+    stream = idlib.systems.orcid.OrcidSandbox
+    ids = [
+        'https://sandbox.orcid.org/0009-0007-0266-5208',
+        'https://sandbox.orcid.org/0000-0002-9383-616X',
+        'https://sandbox.orcid.org/0000-0002-9267-5456',
+        'https://sandbox.orcid.org/0000-0002-0391-3177',
+        'https://sandbox.orcid.org/0009-0002-1173-8142',
+    ]
+    ids_bad = []
+    for __i in ids:  # LOL PYTHON class scope list comprehensions
+        ids_bad.append(__i.replace('https', 'http'))
+    del __i
 
 
 class TestRor(HelpTestStreams, unittest.TestCase):

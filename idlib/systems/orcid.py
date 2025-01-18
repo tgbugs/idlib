@@ -208,3 +208,25 @@ class Orcid(idlib.HelperNoData, idlib.Stream):
         return (self.identifier.iri
                 if asType is None else
                 asType(self.identifier.iri))
+
+
+class OrcidSandboxPrefixes(conv.QnameAsLocalHelper, oq.OntCuries):
+    # set these manually since, sigh, factory patterns
+    _dict = {}
+    _n_to_p = {}
+    _strie = {}
+    _trie = {}
+
+
+OrcidSandboxPrefixes({'orcid': 'https://sandbox.orcid.org/',
+                      'ORCID': 'https://sandbox.orcid.org/',
+                      'orcid.pub.3': 'https://pub.sandbox.orcid.org/v3.0/',})
+
+
+class OrcidIdSandbox(OrcidId):
+    _namespaces = OrcidSandboxPrefixes
+    canonical_regex = (f'^https://sandbox.orcid.org/{OrcidId._common}$')
+
+
+class OrcidSandbox(Orcid):
+    _id_class = OrcidIdSandbox
