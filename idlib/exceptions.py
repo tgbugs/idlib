@@ -36,7 +36,7 @@ class CouldNotReachReferentError(CouldNotReachError):
 
         Note that in a system that is not based on redirects
         this is an error that could be returned by the index
-        but it would appear as an referent unknown error. """
+        but it would appear as a referent unknown error. """
 
     # but its supertype is ReferentUnknown or ReferentUnreachable
 
@@ -59,6 +59,14 @@ class ResolutionError(IdlibError):
     # we should split into NetworkError/TimeoutError
     # and then have RemoteError, because Resolution error is
     # ambiguous, it is the superclass for all of them I think
+    # XXX as used, this is ClientError, and for all but 404
+    # and 410 the response means we can't actually say whether
+    # it is a true null pointer, the naming is thus very bad
+    # because as used this is not a network error, not a timeout
+    # error, it is the server saying i do not/cannot understand
+    # that is MessageReceivedButError which happens before we
+    # know if the id exists and probably actually covers most
+    # of the IdExistsButError cases
 
 
 class MalformedIdentifierError(IdlibError):

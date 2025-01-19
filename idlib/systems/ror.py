@@ -167,6 +167,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         'Healthcare': 'Institution',
         'Facility':   'CoreFacility',
         'Nonprofit':  'Nonprofit',
+        'Funder':     'Funder',  # FIXME funder is a role ...
         'Other':      'Institution',
     }
     @property

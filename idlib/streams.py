@@ -668,7 +668,8 @@ class StreamUri(Stream):
     @cache_result
     def headers(self):
         uri = self.dereference()
-        return uri.progenitor().headers
+        if uri is not None:
+            return uri.progenitor().headers
 
     def data(self, mimetype_accept=None):
         # FIXME TODO should the data associated with the doi
