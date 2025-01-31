@@ -20,6 +20,11 @@ from idlib.utils import (log,
 from idlib.config import auth
 
 
+def path_older_than_day(path):
+    ps = path.stat()
+    return time() - ps.st_ctime > (60 * 60 * 24)
+
+
 # from neurondm.simple
 class OntTerm(oq.OntTerm):
     """ ask things about a term! """
@@ -645,7 +650,7 @@ class Pio(formats.Rdf, idlib.Stream):
         return data
 
     _apiuri_private_cache = {}  # XXX FIXME hack
-    def data4(self, fail_ok=False):
+    def data4(self, fail_ok=False, try_refresh_cache=False):
         if not hasattr(self, '_data'):
             self._data_in_error = True
             if not isinstance(self._progenitors, dict):
@@ -661,7 +666,7 @@ class Pio(formats.Rdf, idlib.Stream):
             # however this is not trivial to retrive
             # the /v3/protocols/{id} endpoint returns bad/mangled data and we need
             # the /v1/ data to be able to actually render to org
-            blob, path = self._get_data(apiuri)
+            blob, path = self._get_data(apiuri, _refresh_cache=try_refresh_cache)
             if 'stream-http' not in self._progenitors:
                 self._progenitors['path'] = path
 
@@ -690,6 +695,16 @@ class Pio(formats.Rdf, idlib.Stream):
                     if fail_ok: return
                     raise exc.IdDoesNotExistError(message)
                 elif sc in (250, 205):  # access requested, not authorized
+                    if path_older_than_day(path):
+                        # there seems to be a case where a protocol is shared
+                        # with us and there is an old cache, in that case we
+                        # hit an infinite loop because getting data for the
+                        # progenitor says we should be able to resolve the
+                        # final protocol now but it was cached on cooldown, if
+                        # we can get to the first progenitor then we likely
+                        # have access to the final url and get will succeed
+                        return self.data4(fail_ok=fail_ok, try_refresh_cache=True)
+
                     try:
                         # there might be a private id in the progenitor chain
                         nself = self.progenitor(type='id-converted-from')
