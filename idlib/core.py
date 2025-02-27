@@ -29,6 +29,26 @@ def try_get(s, head):
     return head
 
 
+def resolution_raise_logic(head):
+    """ broken out into its own function for reuse to avoid re-resolving
+        in cases where we need to interpose additional operations between
+        a dereference failure and raising the error
+    """
+    if not head.ok:
+        try:
+            head.raise_for_status()
+        except Exception as e:
+            if head.status_code == 404:
+                msg = f'Nothing found due to {head.status_code} at {head.url}\n'
+                raise exc.IdDoesNotExistError(msg) from e  # often a permissions issue
+            elif head.status_code >= 500:
+                msg = f'Remote in error due to {head.status_code} at {head.url}\n'
+                raise exc.RemoteError(msg) from e
+            elif head.status_code >= 400:
+                msg = f'Nothing found due to {head.status_code} at {head.url}\n'
+                raise exc.ResolutionError(msg) from e
+
+
 def resolution_chain_responses(iri, raise_on_final=True):
     #doi = doi  # TODO
     s = requests.Session()
@@ -56,14 +76,7 @@ def resolution_chain_responses(iri, raise_on_final=True):
             break
 
     if raise_on_final:  # we still want the chain ... null pointer error comes later?
-        if head.status_code == 404:
-            head.raise_for_status()  # probably a permissions issue
-        elif head.status_code >= 500:
-            msg = f'Remote in error due to {head.status_code} at {head.url}\n'
-            raise exc.RemoteError(msg)
-        elif head.status_code >= 400:
-            msg = f'Nothing found due to {head.status_code} at {head.url}\n'
-            raise exc.ResolutionError(msg)
+        resolution_raise_logic(head)
 
     if head.status_code >= 400:
         # XXX this seems like the "right" thing to do, but it will

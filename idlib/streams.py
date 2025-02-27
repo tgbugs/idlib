@@ -56,8 +56,9 @@ class Stream:
         import requests  # resolver dejoure
         Stream._requests = requests
 
-        from idlib.core import resolution_chain_responses
+        from idlib.core import resolution_chain_responses, resolution_raise_logic
         Stream._resolution_chain_responses = staticmethod(resolution_chain_responses)
+        Stream._resolution_raise_logic = staticmethod(resolution_raise_logic)
 
     @classmethod
     def fromJson(cls, blob):
@@ -626,6 +627,10 @@ class StreamUri(Stream):
     def dereference(self, asType=None):
         drc = self.dereference_chain()
         uri = drc[-1]
+        if uri is None:
+            # null pointer
+            self._resolution_raise_logic(drc[-2]._progenitor)
+
         if asType:
             nid = asType(uri)
             if isinstance(nid, idlib.Stream):
