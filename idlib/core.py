@@ -8,14 +8,25 @@ def resolution_chain(iri):
         yield head.url
 
 
+_user_agent_idiocy = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0'
+
+
 def try_get(s, head):
     # see whether the server has a bad/broken support for head requests
     # sometimes they return e.g. 400 instead of 405, and really they should
     # just work because they work correctly with get request ...
     head = s.get(head.url, stream=True)
+
     if head.ok:
         log.info(f'bad HEAD implementation {head.url}')
-    else:
+    elif head.status_code < 500:
+        head.close()
+        headers = {'User-Agent': _user_agent_idiocy}
+        head = s.get(head.url, headers=headers, stream=True)
+        if head.ok:
+            log.info(f'bad HEAD implementation AND bad User-Agent behavior {head.url}')
+
+    if not head.ok:
         content = head.content
         if content:
             if head.headers['Content-Type'] == 'application/json':

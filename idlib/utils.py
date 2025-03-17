@@ -124,7 +124,12 @@ def makeEnc(alphabet):
     def decode(chars, *, _index=index, _base=base):
         number = 0
         for c in chars:
-            number = number * _base + _index[c]
+            try:
+                cind = _index[c]
+            except KeyError as e:
+                msg = ''.join(chars)
+                raise exc.MalformedIdentifierError(msg) from e
+            number = number * _base + cind
 
         return number
 
