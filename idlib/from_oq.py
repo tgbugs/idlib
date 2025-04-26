@@ -2,6 +2,7 @@ import re
 import json
 from time import time, sleep
 from datetime import datetime
+from urllib.parse import urlparse
 import orthauth as oa
 import ontquery as oq  # temporary implementation detail
 import idlib
@@ -349,6 +350,13 @@ def setup(cls, creds_file=None):
         except exc.ConfigurationError as e:
             log.warning(e)
             cls._pio_header = None
+
+    def rchf(url):
+        purl = urlparse(url)
+        if purl.netloc.endswith('protocols.io'):
+            return cls._pio_header
+
+    cls._resolution_chain_headers_fun = staticmethod(rchf)
 
     if not hasattr(idlib.Stream, '_requests'):
         idlib.Stream.__new__(cls)
@@ -826,7 +834,8 @@ class Pio(formats.Rdf, idlib.Stream):
                     try:
                         return self.data1(fail_ok=fail_ok)
                     except Exception as e1:
-                        raise exc.TransportError() from e1
+                        # FIXME error type ...
+                        raise exc.InbetweenError() from e1
             else:
                 return self.data4(fail_ok=fail_ok)
         except (AttributeError, NotImplementedError) as e:

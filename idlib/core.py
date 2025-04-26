@@ -3,15 +3,15 @@ from . import exceptions as exc
 from .utils import log
 
 
-def resolution_chain(iri):
-    for head in resolution_chain_responses(iri):
+def resolution_chain(iri, headers_fun=None):
+    for head in resolution_chain_responses(iri, headers_fun=headers_fun):
         yield head.url
 
 
 _user_agent_idiocy = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0'
 
 
-def try_get(s, head):
+def try_get(s, head, headers_fun=None):
     # see whether the server has a bad/broken support for head requests
     # sometimes they return e.g. 400 instead of 405, and really they should
     # just work because they work correctly with get request ...
@@ -25,6 +25,21 @@ def try_get(s, head):
         head = s.get(head.url, headers=headers, stream=True)
         if head.ok:
             log.info(f'bad HEAD implementation AND bad User-Agent behavior {head.url}')
+        else:
+            headers = None
+            if headers_fun is not None:
+                # headers_fun is used to ensure that e.g. auth headers
+                # are only sent to the netloc's they are for
+                headers = headers_fun(head.url)
+                if headers is not None:
+                    head = s.get(head.url, headers=headers, stream=True)
+                    if head.ok:
+                        # we log a warning because dereferencing a public id
+                        # and encountering a permission boundary is bad
+                        # TODO likely need a way to fail on this condition
+                        # or at least indicate that it happend in band
+                        msg = f'additional headers were added for {head.url}'
+                        log.warning(msg)
 
     if not head.ok:
         content = head.content
@@ -60,14 +75,14 @@ def resolution_raise_logic(head):
                 raise exc.ResolutionError(msg) from e
 
 
-def resolution_chain_responses(iri, raise_on_final=True):
+def resolution_chain_responses(iri, raise_on_final=True, headers_fun=None):
     #doi = doi  # TODO
     s = requests.Session()
     head = s.head(iri, allow_redirects=False)
     if head.status_code < 400:
         yield head
     else:
-        head = try_get(s, head)
+        head = try_get(s, head, headers_fun=headers_fun)
         yield head
 
     while head.is_redirect and head.status_code < 400:  # FIXME redirect loop issue
@@ -80,7 +95,7 @@ def resolution_chain_responses(iri, raise_on_final=True):
         if head.status_code < 400:
             yield head
         else:
-            head = try_get(s, head)
+            head = try_get(s, head, headers_fun=headers_fun)
             yield head
 
         if not head.is_redirect:

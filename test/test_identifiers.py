@@ -183,6 +183,7 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'https://www.protocols.io/view/21417',
         'https://www.protocols.io/api/v3/protocols/21417',
         'https://www.protocols.io/api/v4/protocols/21417',
+        'https://www.protocols.io/api/v4/protocols/126454',
 
         'pio.view:human-islet-microvasculature-immunofluorescence-in-y3tfynn/materials',
 

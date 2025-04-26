@@ -41,6 +41,8 @@ class Stream:
 
     _progenitors = MappingProxyType({})  # this is a dict, but immutable to prevent accidents
 
+    _resolution_chain_headers_fun = None
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls)
 
@@ -609,8 +611,10 @@ class StreamUri(Stream):
                 dc[self.identifier_actionable] = tuple(
                     resp if resp is None else StringProgenitor(resp.url, progenitor=resp)
                     for resp in
-                    self._resolution_chain_responses(self.identifier_actionable,
-                                                     raise_on_final=False))
+                    self._resolution_chain_responses(
+                        self.identifier_actionable,
+                        raise_on_final=False,
+                        headers_fun=self._resolution_chain_headers_fun))
             except (exc.ResolutionError, exc.RemoteError) as e:
                 # TODO
                 # FIXME partial resolution is a complete nightmare
