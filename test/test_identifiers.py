@@ -193,6 +193,11 @@ class TestPio(HelpTestStreams, unittest.TestCase):
         'https://www.protocols.io/view/18980',  # deleted
         'https://www.protocols.io/api/v3/protocols/18980',  # deleted
         'https://www.protocols.io/private/D327A68038D5B4ECB32964C22D904270',  # deleted
+
+        # malformed slug causing issues with asDict ... FIXME also possibly changes in Pio api
+        # because now the error says NotAuthorized ... which seems suspicious
+        'https://www.protocols.io/view/transfection-protocol-for-n2a-and-hek293-using-pro-75mhq50',
+        'https://www.protocols.io/api/v4/protocols/transfection-protocol-for-n2a-and-hek293-using-pro-75mhq50',
     ]
 
     @skipif_no_net
