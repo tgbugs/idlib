@@ -2065,6 +2065,14 @@ class Pio(formats.Rdf, idlib.Stream):
                 if include_private and self.identifier.is_private():
                     out['uri_private'] = self.identifier  # FIXME some way to avoid leaking these if needed?
                 return out
+            except exc.MalformedIdentifierError as e:
+                out = super().asDict(include_description)
+                out['malformed'] = True
+                if 'errors' not in out:
+                    out['errors'] = []
+
+                out['errors'].append({'message': 'malformed'})
+                return out
             except exc.RemoteError as e:
                 # we don't have any metadata but we will return what little info we have
                 return super().asDict(include_description)
