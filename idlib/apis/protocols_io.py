@@ -3,7 +3,6 @@ import sys
 import pickle
 from urllib import parse
 from getpass import getpass
-from ..config import auth
 from ..utils import log as _log
 from . import log as _log
 
@@ -68,11 +67,16 @@ def get_auth_code(url):
 
 
 def get_protocols_io_auth(creds_file,
-                          store_file=auth.get_path('protocols-io-api-store-file'),
-                          # yes reading from the store file here at the top level
-                          # increases startup time, however if it is burried then
-                          # any config error is deferred until later in runtime
+                          store_file=None,
                           SCOPES='readwrite'):
+    if store_file is None:
+        # since this file is imported whenever idlib is imported
+        # the time cost is prohibitive and we will just have to
+        # deal with the configuration value failing later in time
+        # by e.g. having a separate check config process
+        from ..config import auth
+        store_file = auth.get_path('protocols-io-api-store-file')
+
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
     from idlib import exceptions as exc
