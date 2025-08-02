@@ -175,7 +175,51 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
             if descs:
                 return sorted(descs, key=len, reverse=True)[0]
 
+    def proper_citation(self):
+        ms = self.metadata()
+        if ms:
+            cites = set(m['rrid']['properCitation'] for m in ms if 'rrid' in m and 'properCitation' in m['rrid'])
+            if cites:
+                return sorted(cites, key=len, reverse=True)[0]
+
+    # output streams
+
+    def _triples_gen(self,
+                     rdflib=None,
+                     rdf=None,
+                     rdfs=None,
+                     owl=None,
+                     NIFRID=None,
+                     TEMP=None,
+                     **kwargs):
+        """ implementation of method to produce a
+            triplified version of the record """
+        s = self.asUri(rdflib.URIRef)
+        yield s, rdf.type, owl.NamedIndividual
+        try:
+            pc = self.proper_citation()
+            if pc:
+                yield s, TEMP.properCitation, rdflib.Literal(pc)
+        except exc.ResolutionError as e:
+            log.exception(e)
+            yield s, TEMP.resolutionError, rdflib.Literal(True)
+            return
+        except exc.RemoteError as e:
+            log.exception(e)
+            yield s, TEMP.remoteError, rdflib.Literal(True)
+            return
+
+        yield s, rdfs.label, rdflib.Literal(self.label)
+
     # alternate representations
+
+    def asDict(self):
+        out = super().asDict()
+        pc = self.proper_citation()
+        if pc:
+            out['proper_citation'] = pc
+
+        return out
 
     def asUri(self, asType=None):
         # TODO n2t, identifiers.org
