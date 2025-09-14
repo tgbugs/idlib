@@ -97,7 +97,7 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     def _checksum(self, cypher):  # FIXME unqualified checksum goes to ... metadata ???
         m = cypher()
         metadata = self.metadata()
-        name = metadata['name']
+        name = self._name(metadata)
         m.update(self.identifier.checksum(cypher))
         m.update(self.id_bound_metadata.checksum(cypher))
         m.update(name.encode())  # unix epoch -> ??
@@ -143,9 +143,19 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
                 # or the remote telling us that we are in error
                 raise exc.RemoteError(self.identifier) from e
 
+    @staticmethod
+    def _name(m):
+        if 'names' in m:
+            for name in m['names']:
+                if 'ror_display' in name['types']:
+                    return name['value']
+        else:
+            return m['name']
+
     @property
     def name(self):
-        return self.metadata()['name']
+        m = self.metadata()
+        return self._name(m)
 
     def asExternalId(self, id_class):
         eids = self.data['external_ids']
@@ -170,6 +180,11 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         'Funder':     'Funder',  # FIXME funder is a role ...
         'Other':      'Institution',
     }
+    for _k, _v in list(_type_map.items()):
+        _type_map[_k.lower()] = _v
+    del _k
+    del _v
+
     @property
     def institutionTypes(self):
         metadata = self.metadata()
@@ -214,19 +229,29 @@ class Ror(formats.Rdf, idlib.HelperNoData, idlib.Stream):
     def synonyms_rdf(self, rdflib):  # FIXME annoying
         d = self.metadata()
         # FIXME how to deal with type conversion an a saner way ...
-        yield from [rdflib.Literal(s) for s in d['aliases']]
-        yield from [rdflib.Literal(s) for s in d['acronyms']]
-        yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
+        if 'names' in d:
+            for name in d['names']:
+                if 'ror_display' not in name['types']:
+                    yield rdflib.Literal(name['value'], lang=name['lang'])
+        else:
+            yield from [rdflib.Literal(s) for s in d['aliases']]
+            yield from [rdflib.Literal(s) for s in d['acronyms']]
+            yield from [rdflib.Literal(l['label'], lang=l['iso639']) for l in d['labels']]
 
     @property
     def synonyms(self):
         out = []
         m = self.metadata()
-        for a in m['aliases'] + m['acronyms']:
-            out.append(a)
+        if 'names' in m:
+            for name in m['names']:
+                if 'ror_display' not in name['types']:
+                    out.append(name['value'])
+        else:
+            for a in m['aliases'] + m['acronyms']:
+                out.append(a)
 
-        for l in m['labels']:
-            out.append(l['label'])
+            for l in m['labels']:
+                out.append(l['label'])
 
         return out
 
