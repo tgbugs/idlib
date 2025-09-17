@@ -97,6 +97,9 @@ class Doi(formats.Rdf, idlib.Stream):  # FIXME that 'has canonical representaito
     def __init__(self, doi_in_various_states_of_mangling=None, iri=None):
         self._identifier = self._id_class(doi_in_various_states_of_mangling, iri)
 
+    def __repr__(self):
+        return f'<idlib.{self.__class__.__name__}({self._identifier.asStr()!r})>'
+
     def __gt__(self, other):
         if isinstance(other, idlib.Stream):
             return self.identifier > other.identifier
