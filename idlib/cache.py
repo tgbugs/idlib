@@ -1,4 +1,5 @@
 import json
+import pickle
 import hashlib
 import inspect
 from pathlib import Path
@@ -66,6 +67,10 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
         serialize = json.dump
         deserialize = json.load
         mode = 't'
+    elif ser == 'pickle':
+        serialize = pickle.dump
+        deserialize = pickle.load
+        mode = 'b'
     else:
         raise TypeError('Bad serialization format.')
 
@@ -100,8 +105,14 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
             else:
                 output = function(*args, **kwargs)
                 if output is not None:
-                    with open(filepath, write_mode) as f:
-                        serialize(output, f)
+                    try:
+                        with open(filepath, write_mode) as f:
+                            serialize(output, f)
+                    except Exception as e:
+                        filepath.unlink()
+                        # TODO remove serialization on failure so we
+                        # don't think a real cache exists
+                        raise e
 
             if isinstance(output, dict) and COOLDOWN in output:
                 # a hack to put a dummy variable in the cache
