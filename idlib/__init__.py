@@ -55,4 +55,4 @@ def get_right_id(uri):
     return pi
 
 
-__version__ = '0.0.1.dev23'
+__version__ = '0.0.1.dev24'
