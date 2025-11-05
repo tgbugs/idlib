@@ -36,7 +36,6 @@ setup(name='idlib',
       license='MIT',
       classifiers=[
           'Development Status :: 4 - Beta',
-          'License :: OSI Approved :: MIT License',
           'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
