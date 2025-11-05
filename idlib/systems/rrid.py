@@ -11,12 +11,12 @@ from idlib.config import auth
 
 class RridId(idlib.Identifier):
 
-    canonical_regex = 'RRID:([A-Za-z]+)_([A-Za-z0-9_:-]+)'
+    canonical_regex = '^RRID:([A-Za-z]+)_([A-Za-z0-9_:-]+)$'
     # NOTE: the canonical regex fails to capture a couple
     # of legacy cases e.g. RRID:WB-STRAIN_ and RRID:MGI:
     # yes I understand why MGI doesn't want RRID:MGI_MGI:
     # but what other identifier namespaces do they use?
-    _variant_regex = 'RRID:([A-Z]+):([A-Za-z0-9_:-]+)'  # legacy
+    _variant_regex = '^RRID:([A-Z]+):([A-Za-z0-9_:-]+)$'  # legacy
     _local_conventions = conv.Identity
 
     def __init__(self, rrid):

@@ -501,9 +501,18 @@ class HelpTestStreams:
 
     def test_malformed(self):
         bads = []
-        for i in self.ids_bad:
+        vbads = []
+        pre_garbage = 'oops '
+        post_garbage = ' oops'
+        bad_ids = (
+            list(self.ids_bad) +
+            [pre_garbage + i for i in self.ids] +
+            [i + post_garbage for i in self.ids])
+        for i in bad_ids:
             try:
                 d = self.stream(i)
+                d.identifier.validate()
+                vbads.append(d)
                 d.data()
                 bads.append(d)
             except Exception as e:
@@ -511,6 +520,7 @@ class HelpTestStreams:
                 pass
 
         assert not bads, bads
+        assert not vbads, vbads
 
     def test_hash_eq_id(self):
         hrm = self.ids[0]

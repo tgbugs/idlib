@@ -142,7 +142,10 @@ class TestRrid(HelpTestStreams, unittest.TestCase):
         'RRID:Addgene_19640',
         #'RRID:NCBITaxon_9606',  # TODO not in resolver yet
     ]
-    ids_bad = ['lol not an identifier']
+    ids_bad = [
+        'lol not an identifier',
+        'RRID:RGD_737929 Charles River RS:0001011',
+    ]
 
 
 @skipif_ci
