@@ -758,7 +758,7 @@ class Pio(formats.Rdf, idlib.Stream):
                     # and pio json mean there is an extra layer that needs
                     # interpretation ... i.e. we definitely got to the remote
                     raise NotImplementedError(msg)
-                elif sc = 1266:
+                elif sc == 1266:
                     msg = 'rate limit exceeded'
                     if fail_ok: return
                     path.unlink()  # hopefully works next time?
