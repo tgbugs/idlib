@@ -821,8 +821,10 @@ class Pio(formats.Rdf, idlib.Stream):
                 # for how we got there, even if we toss the crazy slugs
                 self._progenitors = {}  # FIXME yes this blasts progens every time
                 uh = self.uri_human
+                _sigh = uh._progenitors.pop('id-converted-from')  # avoid infinite recursion
                 uai = uh.uri_api_int
                 d4 = uai.data4(fail_ok=fail_ok)
+                uh._progenitors['id-converted-from'] = _sigh
                 self._progenitors['id-converted-to'] = uai
                 if 'path' in uai._progenitors:
                     self._progenitors['path'] = uai._progenitors['path']
