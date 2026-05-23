@@ -1,4 +1,5 @@
 import re
+from time import sleep
 import idlib
 from idlib import formats
 from idlib import streams
@@ -101,10 +102,31 @@ class Rrid(formats.Rdf, idlib.HelperNoData, idlib.Stream):
         elif self._COOLDOWN and self._resp_metadata.status_code == 404:
             msg = f'RRID failure: {self._resp_metadata.status_code} {self.asUri()}'
             return {COOLDOWN: msg,}
+        elif self._resp_metadata.status_code == 429:
+            headers = self._resp_metadata.headers
+            if 'Retry-After' in headers:
+                try:
+                    wait = int(headers['Retry-After'])
+                except ValueError as ve:
+                    try:
+                        self._resp_metadata.raise_for_status()
+                    except Exception as e:
+                        raise exc.ResolutionError(identifier) from e
+
+                if wait > 20:
+                    try:
+                        self._resp_metadata.raise_for_status()
+                    except Exception as e:
+                        raise exc.ResolutionError(identifier) from e
+
+                log.debug(f'waiting {wait}s for {identifier}')
+                sleep(wait)
+                return self._metadata(identifier)
+
         else:
             try:
                 self._resp_metadata.raise_for_status()
-            except BaseException as e:
+            except Exception as e:
                 raise exc.ResolutionError(identifier) from e
 
     @cache_result
