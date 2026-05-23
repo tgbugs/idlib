@@ -840,12 +840,17 @@ class Pio(formats.Rdf, idlib.Stream):
                 except Exception as e0:
                     try:
                         return self.data1(fail_ok=fail_ok)
+                    except exc.IdDoesNotExistError as ene1:
+                        raise ene1
                     except Exception as e1:
                         # FIXME error type ...
                         raise exc.InbetweenError() from e1
             else:
                 return self.data4(fail_ok=fail_ok)
         except (AttributeError, NotImplementedError) as e:
+            raise e
+        except exc.IdDoesNotExistError as e:
+            # don't wait for pioids that don't exist
             raise e
         except Exception as e:
             wait_until = time() + self._wait_time
