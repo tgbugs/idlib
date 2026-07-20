@@ -85,6 +85,7 @@ def cache(folder, ser='json', clear_cache=False, create=False, return_path=False
         folder.mkdir(parents=True)
 
     if clear_cache:
+        import shutil
         log.debug(f'clearing cache for {folder}')
         shutil.rmtree(folder)
         folder.mkdir()
