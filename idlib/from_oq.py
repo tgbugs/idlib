@@ -432,6 +432,10 @@ class Pio(formats.Rdf, idlib.Stream):
         if data:
             doi = data['doi']
             if doi:
+                if not doi.startswith('http'):
+                    # why is there no scheme? who knows!?
+                    doi = 'https://' + doi
+
                 return idlib.Doi(doi)
 
     @property

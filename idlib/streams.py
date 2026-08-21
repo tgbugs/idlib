@@ -464,7 +464,11 @@ class HelpTestStreams:
                 print(d.identifier.prefix)
                 print(d.identifier.suffix)
                 if d.identifier.prefix is None or d.identifier.suffix is None:
-                    bads.append(d.identifier.__dict__)
+                    if hasattr(d.identifier, 'iri') and hasattr(d.identifier, 'valid') and d.identifier.valid:
+                        # doi case
+                        pass
+                    else:
+                        bads.append(d.identifier.__dict__)
 
             try:
                 d.identifier_bound_metadata

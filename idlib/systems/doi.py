@@ -1,3 +1,5 @@
+import re
+from urllib.parse import unquote, quote
 import ontquery as oq  # temp implementation detail
 import idlib
 from idlib import formats
@@ -26,8 +28,11 @@ class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a s
     _namespaces = _DoiPrefixes
     _local_conventions = _namespaces
     _id_class = str  # eventually we have to drop down to something
-    local_regex = '^10\\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
-    canonical_regex = '^https://doi.org/10\\.[0-9]{4,9}[-._;()/:a-zA-Z0-9]+$'
+    # https://www.crossref.org/blog/dois-and-matching-regular-expressions/
+    # but we have cases that don't follow in our set ... so we may need a variant regex
+    # so we can warn if we see one
+    local_regex = '^10\\.[0-9]{4,9}/[-._;()<>/:a-zA-Z0-9]+$'
+    canonical_regex = '^https://doi.org/10\\.[0-9]{4,9}/[-._;()<>/:a-zA-Z0-9]+$'
 
     def __new__(cls, doi_in_various_states_of_mangling=None, iri=None):
         if doi_in_various_states_of_mangling is None and iri is not None:
@@ -59,22 +64,29 @@ class DoiId(oq.OntId, idlib.Identifier, idlib.Stream):  # also _technically_ a s
 
     @staticmethod
     def normalize(doi):
-        doi = doi.replace(' ', '')
-        if 'http' in doi or 'doi.org' in doi:
+        doi = doi.strip().replace(' :', ':').replace(': ', ':')
+        if doi.startswith('http') or doi.startswith('doi.org'):
             doi = '10.' + doi.split('.org/10.', 1)[-1]
+            # space is left in quote to ensure we produce an error because there should be no spaces
+            doi = quote(unquote(doi), safe='-._;()/: ')
         elif doi.startswith('doi:'):
-            doi = doi.strip('doi:')
+            doi = doi.strip('doi:').strip()
         elif doi.startswith('DOI:'):
-            doi = doi.strip('DOI:')
+            doi = doi.strip('DOI:').strip()
+
         return doi
 
     @property
     def valid(self):
-        return self.suffix is not None and self.suffix.startswith('10.')
+        if self.curie is None:
+            # we may have one of the pathalogical cases
+            return re.match(self.canonical_regex, unquote(self.iri))
+        else:
+            return self.suffix is not None and self.suffix.startswith('10.')
 
     def validate(self):
         if not self.valid:
-            raise exc.MalformedIdentifierError(f'{self._unnormalized} does not appear '
+            raise exc.MalformedIdentifierError(f'{self._unnormalized!r} does not appear '
                                                f'to be of type {self.__class__}')
 
 

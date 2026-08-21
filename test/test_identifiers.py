@@ -36,6 +36,7 @@ class TestDoi(HelpTestStreams, unittest.TestCase):
     ids = [
         'https://doi.org/10.13003/5jchdy',
         'https://doi.org/10.1101/2020.10.19.343129',  # crossref 500 error
+        'https://doi.org/10.1002/(SICI)1096-9136(199608)13:8%3C700::AID-DIA174%3E3.0.CO;2-8',  # oof
     ]
     ids_bad = ['lol not an identifier']
     def test_version_f1000(self):
